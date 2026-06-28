@@ -1,0 +1,3053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dockside — A Fishing Game</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Ultra&family=Space+Mono:wght@400;700&family=Karla:wght@400;500;700&display=swap');
+
+  :root{
+    --bg-deep:#0B2E33;
+    --water-base:#14524F;
+    --water-light:#1E6B63;
+    --wood:#6B4226;
+    --wood-dark:#4A2C18;
+    --brass:#C7913C;
+    --brass-light:#E2B563;
+    --glow:#8FD14F;
+    --paper:#EFE6D2;
+    --ink:#1B1410;
+    --rarity-common:#9CA9A6;
+    --rarity-uncommon:#4FB6A8;
+    --rarity-rare:#C7913C;
+    --rarity-legendary:#8FD14F;
+    --rarity-accessory:#bf4fff;
+    --font-display:'Ultra', serif;
+    --font-mono:'Space Mono', monospace;
+    --font-body:'Karla', sans-serif;
+    --shadow-soft: 0 10px 28px rgba(0,0,0,0.4);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{
+    min-height:100vh;
+    background: radial-gradient(ellipse at top, #173a3f 0%, var(--bg-deep) 55%, #061a1d 100%);
+    color:var(--paper);
+    font-family:var(--font-body);
+    padding:24px 14px 48px;
+    display:flex;
+    justify-content:center;
+  }
+  .hidden{display:none !important;}
+  .app{width:100%;max-width:1060px;}
+
+  /* ---------- Header ---------- */
+  .app-header{
+    position:relative;
+    background:linear-gradient(180deg, #7a5230, #5b3c20);
+    border-radius:16px 16px 6px 6px;
+    padding:14px 22px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    box-shadow:var(--shadow-soft);
+    border-bottom:4px solid var(--brass);
+    margin-bottom:18px;
+    overflow:hidden;
+  }
+  .app-header::before{
+    content:'';position:absolute;inset:0;
+    background-image:repeating-linear-gradient(90deg,rgba(0,0,0,0.10) 0 2px,transparent 2px 26px);
+    pointer-events:none;
+  }
+  .brand{display:flex;align-items:center;gap:12px;position:relative;z-index:1;}
+  .brand-mark{font-size:1.8rem;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.4));}
+  .brand h1{margin:0;font-family:var(--font-display);font-size:1.5rem;letter-spacing:0.06em;color:var(--paper);text-transform:uppercase;}
+  .brand .tagline{margin:2px 0 0;font-size:0.78rem;font-style:italic;color:rgba(239,230,210,0.75);}
+  .header-right{display:flex;align-items:center;gap:10px;position:relative;z-index:1;}
+  .wallet{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.2);padding:8px 14px;border-radius:20px;}
+  .coin-icon{width:22px;height:22px;flex-shrink:0;}
+  .coin-amount{font-family:var(--font-mono);font-weight:700;font-size:1.15rem;color:var(--brass-light);}
+  .active-gear{display:flex;gap:6px;flex-wrap:wrap;}
+  .gear-badge{
+    display:flex;align-items:center;gap:4px;
+    background:rgba(191,79,255,0.15);border:1px solid rgba(191,79,255,0.4);
+    padding:4px 8px;border-radius:12px;font-size:0.7rem;font-family:var(--font-mono);
+    color:#d898ff;
+  }
+  .gear-badge .gear-icon{font-size:0.95rem;}
+
+  /* ---------- Layout ---------- */
+  .layout{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;}
+  @media(max-width:800px){.layout{grid-template-columns:1fr;}}
+
+  .card{
+    background:linear-gradient(180deg,#25393a,#16292a);
+    border:1px solid rgba(199,145,60,0.25);
+    border-radius:16px;padding:18px;
+    box-shadow:var(--shadow-soft);
+  }
+
+  /* ---------- Pond ---------- */
+  .pond{
+    position:relative;height:260px;border-radius:12px;overflow:hidden;
+    background:linear-gradient(180deg,var(--water-light),var(--water-base) 45%,#0c2f2d 100%);
+    box-shadow:inset 0 0 40px rgba(0,0,0,0.4);
+    margin-bottom:14px;
+  }
+  .pond::before{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:13%;
+    background:linear-gradient(90deg,var(--wood-dark),var(--wood));
+    box-shadow:4px 0 14px rgba(0,0,0,0.45);z-index:2;
+  }
+  .ripples{position:absolute;inset:0;overflow:hidden;}
+  .ripple{
+    position:absolute;width:8px;height:8px;border:2px solid rgba(255,255,255,0.45);
+    border-radius:50%;transform:translate(-50%,-50%);
+    animation:rippleGrow 2.2s ease-out forwards;
+  }
+  @keyframes rippleGrow{0%{width:6px;height:6px;opacity:0.6;}100%{width:110px;height:38px;opacity:0;}}
+  .bobber{
+    position:absolute;left:16%;top:50%;width:18px;height:18px;
+    border-radius:50%;transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 35% 30%,#fff,#d4453f 60%,#8e1f1f);
+    box-shadow:0 3px 8px rgba(0,0,0,0.45);
+    transition:left 0.5s ease-out,top 0.5s ease-out,background 0.4s;z-index:3;
+  }
+  .bobber.idle-bob{animation:bobFloat 2.4s ease-in-out infinite;}
+  .bobber.bite-dip{animation:biteDip 0.5s ease-in-out infinite;}
+  @keyframes bobFloat{0%,100%{transform:translate(-50%,-50%);}50%{transform:translate(-50%,-30%);}}
+  @keyframes biteDip{0%{transform:translate(-50%,-50%);}30%{transform:translate(-50%,10%);}60%{transform:translate(-50%,-40%);}100%{transform:translate(-50%,-10%);}}
+
+  .alert-badge{
+    position:absolute;left:16%;top:50%;width:26px;height:26px;margin-left:14px;margin-top:-30px;
+    border-radius:50%;background:var(--glow);color:var(--ink);
+    font-family:var(--font-display);font-size:14px;
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;transform:scale(0.4);
+    transition:opacity 0.25s,transform 0.25s,left 0.5s ease-out,top 0.5s ease-out;
+    box-shadow:0 0 14px var(--glow);z-index:4;
+  }
+  .alert-badge.show{opacity:1;transform:scale(1);}
+  .alert-badge.accessory-bite{background:#bf4fff;box-shadow:0 0 14px #bf4fff;}
+
+  .rig-info{text-align:center;font-family:var(--font-mono);font-size:0.75rem;color:rgba(239,230,210,0.7);margin-bottom:6px;}
+  .status-text{text-align:center;min-height:1.4em;margin:4px 0 14px;font-size:0.95rem;font-weight:500;}
+  .hint{text-align:center;font-size:0.72rem;font-style:italic;opacity:0.55;margin:10px 0 0;}
+  .action-zone{display:flex;flex-direction:column;align-items:center;gap:10px;}
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    font-family:var(--font-display);letter-spacing:0.04em;text-transform:uppercase;
+    font-size:0.82rem;padding:12px 26px;border-radius:10px;border:none;cursor:pointer;
+    transition:transform 0.15s,filter 0.15s,box-shadow 0.15s;
+  }
+  .btn:active{transform:translateY(2px);}
+  .btn:focus-visible{outline:none;box-shadow:0 0 0 3px var(--glow);}
+  .btn:disabled{opacity:0.45;cursor:not-allowed;box-shadow:none;}
+  .btn-primary{background:linear-gradient(180deg,var(--brass-light),var(--brass));color:var(--ink);box-shadow:0 4px 0 var(--wood-dark);}
+  .btn-primary:hover:not(:disabled){filter:brightness(1.08);}
+  .btn-accent{background:linear-gradient(180deg,#a6e07a,var(--glow));color:var(--ink);box-shadow:0 4px 0 #4d8a2a;}
+  .btn-accent:hover:not(:disabled){filter:brightness(1.08);}
+  .btn-brass{background:var(--brass);color:var(--ink);box-shadow:0 3px 0 var(--wood-dark);}
+  .btn-ghost{background:transparent;border:1px solid rgba(239,230,210,0.4);color:var(--paper);}
+  .btn-purple{background:linear-gradient(180deg,#d06bff,#9b30e0);color:#fff;box-shadow:0 4px 0 #5a1a8a;}
+  .btn-purple:hover:not(:disabled){filter:brightness(1.1);}
+  .btn-small{padding:8px 14px;font-size:0.68rem;}
+  .cant-afford{opacity:0.62;}
+
+  /* ---------- Hook window ---------- */
+  .hook-zone{width:100%;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:8px;}
+  .hook-timer{width:100%;height:8px;background:rgba(0,0,0,0.35);border-radius:6px;overflow:hidden;}
+  .hook-timer-fill{height:100%;width:100%;background:var(--glow);}
+  .hook-timer-fill.accessory-timer{background:#bf4fff;}
+
+  /* ---------- Reel rig ---------- */
+  .reel-rig{display:flex;flex-direction:column;align-items:center;gap:14px;}
+  .reel-inner{display:flex;align-items:center;justify-content:center;gap:16px;}
+  .reel-track{
+    position:relative;width:44px;height:150px;
+    background:linear-gradient(180deg,#0c2f2d,#163e3a);
+    border:2px solid var(--wood-dark);border-radius:10px;overflow:hidden;
+  }
+  .reel-track::after{
+    content:'';position:absolute;inset:0;
+    background-image:repeating-linear-gradient(0deg,rgba(255,255,255,0.08) 0 1px,transparent 1px 19px);
+  }
+  .catch-zone{
+    position:absolute;left:0;width:100%;
+    background:linear-gradient(180deg,rgba(143,209,79,0.32),rgba(143,209,79,0.5));
+    border-top:2px solid var(--glow);border-bottom:2px solid var(--glow);
+  }
+  .catch-zone.zone-active{box-shadow:0 0 18px var(--glow) inset;}
+  .fish-marker{position:absolute;left:50%;width:34px;height:17px;transform:translate(-50%,-50%);color:var(--paper);z-index:2;transition:color 0.3s,filter 0.3s;}
+  .reel-controls{display:flex;flex-direction:column;align-items:center;gap:10px;}
+  /* Horizontal progress bar below reel */
+  .progress-bar{
+    width:100%;max-width:520px;height:24px;
+    background:rgba(0,0,0,0.45);
+    border-radius:12px;overflow:hidden;
+    display:flex;flex-direction:row;
+    border:1.5px solid rgba(199,145,60,0.3);
+    box-shadow:inset 0 2px 8px rgba(0,0,0,0.5);
+    position:relative;
+  }
+  .progress-fill{
+    height:100%;width:50%;
+    background:linear-gradient(90deg,var(--brass),var(--glow) 60%,#c8ff80);
+    transition:width 0.05s linear;
+    box-shadow:0 0 12px var(--glow);
+    border-radius:12px;
+  }
+  .progress-fill.progress-low{
+    background:linear-gradient(90deg,#c0524a,#ff7043 60%,#ff9800);
+    box-shadow:0 0 10px #ff4422;
+  }
+  .progress-fill.progress-high{
+    background:linear-gradient(90deg,var(--glow),#c8ff80,#fff);
+    box-shadow:0 0 18px var(--glow),0 0 30px rgba(143,209,79,0.4);
+  }
+  .progress-label{
+    position:absolute;right:10px;top:50%;transform:translateY(-50%);
+    font-family:var(--font-mono);font-size:0.6rem;color:rgba(239,230,210,0.55);
+    pointer-events:none;
+  }
+  .reel-btn{touch-action:none;user-select:none;}
+  .reel-btn.held{filter:brightness(0.9);transform:translateY(2px);}
+
+  /* ---------- Tabs & panels ---------- */
+  .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+  .tab-btn{
+    flex:1;min-width:70px;background:rgba(0,0,0,0.22);border:1px solid rgba(199,145,60,0.3);
+    color:var(--paper);padding:9px 6px;border-radius:10px 10px 0 0;
+    font-family:var(--font-display);font-size:0.72rem;letter-spacing:0.04em;cursor:pointer;
+  }
+  .tab-btn.active{background:var(--brass);color:var(--ink);}
+  .tab-btn.tab-acc.active{background:#9b30e0;color:#fff;border-color:#bf4fff;}
+
+  .cooler-summary{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-family:var(--font-mono);font-size:0.85rem;}
+  .fish-list{list-style:none;margin:0;padding:0;max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
+  .fish-card{
+    display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.22);
+    border-left:4px solid var(--rarity-common);padding:8px 10px;border-radius:8px;
+    color:var(--rarity-common);
+  }
+  .fish-card.rarity-uncommon{border-left-color:var(--rarity-uncommon);color:var(--rarity-uncommon);}
+  .fish-card.rarity-rare{border-left-color:var(--rarity-rare);color:var(--rarity-rare);}
+  .fish-card.rarity-legendary{border-left-color:var(--rarity-legendary);color:var(--rarity-legendary);}
+  .fish-card.rarity-megalodon{border-left-color:#bf4fff;color:#bf4fff;animation:megaloPulse 2s ease-in-out infinite;}
+  .fish-card.rarity-accessory{border-left-color:#bf4fff;color:#bf4fff;}
+
+  /* Rarity glows */
+  .fish-card.rarity-common{box-shadow:0 0 10px 2px rgba(156,169,166,0.18);}
+  .fish-card.rarity-uncommon{box-shadow:0 0 12px 2px rgba(79,182,168,0.28);}
+  .fish-card.rarity-rare{box-shadow:0 0 14px 3px rgba(199,145,60,0.35);}
+  .fish-card.rarity-legendary{box-shadow:0 0 18px 4px rgba(143,209,79,0.45);}
+  .fish-card.rarity-megalodon{box-shadow:0 0 24px 6px rgba(191,79,255,0.55);}
+  .fish-card.rarity-accessory{box-shadow:0 0 16px 3px rgba(191,79,255,0.4);}
+
+  .fish-icon{width:40px;height:auto;flex-shrink:0;}
+  .fish-info{flex:1;display:flex;flex-direction:column;font-size:0.85rem;color:var(--paper);}
+  .fish-info strong{font-weight:700;}
+  .fish-info span{font-family:var(--font-mono);opacity:0.85;font-size:0.74rem;}
+  .empty-state{opacity:0.6;font-style:italic;text-align:center;padding:22px 0;list-style:none;}
+
+  .panel-heading{
+    font-family:var(--font-display);font-size:0.82rem;letter-spacing:0.06em;
+    color:var(--brass-light);margin:16px 0 8px;text-transform:uppercase;
+  }
+  .panel-heading:first-child{margin-top:0;}
+  .panel-heading.purple{color:#d898ff;}
+  .card-list{display:flex;flex-direction:column;gap:8px;}
+  .shop-card{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    background:rgba(0,0,0,0.22);border:1px solid rgba(199,145,60,0.2);
+    border-radius:10px;padding:10px 12px;
+  }
+  .shop-card.equipped{border-color:var(--glow);box-shadow:0 0 10px rgba(143,209,79,0.2);}
+  .shop-card.acc-equipped{border-color:#bf4fff;box-shadow:0 0 10px rgba(191,79,255,0.3);}
+  .shop-card-main{flex:1;}
+  .shop-card-main h3{margin:0 0 2px;font-size:0.92rem;font-weight:700;}
+  .shop-card-main p{margin:0;font-size:0.74rem;opacity:0.72;}
+  .stat-line{font-family:var(--font-mono) !important;opacity:0.6 !important;margin-top:3px !important;}
+  .effect-line{font-size:0.72rem !important;color:#d898ff !important;opacity:1 !important;margin-top:2px !important;}
+
+  /* ---------- Accessory slots ---------- */
+  .acc-slots{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
+  .acc-slot{
+    background:rgba(0,0,0,0.3);border:2px dashed rgba(191,79,255,0.3);
+    border-radius:12px;padding:10px 6px;text-align:center;
+    font-size:0.7rem;color:rgba(239,230,210,0.45);font-family:var(--font-mono);
+    min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    cursor:default;transition:border-color 0.2s;position:relative;
+  }
+  .acc-slot.filled{border-style:solid;border-color:rgba(191,79,255,0.6);color:var(--paper);}
+  .acc-slot .slot-icon{font-size:1.5rem;line-height:1;}
+  .acc-slot .slot-name{font-size:0.62rem;line-height:1.2;}
+  .acc-slot .slot-remove{
+    position:absolute;top:4px;right:5px;background:none;border:none;
+    color:rgba(239,230,210,0.4);cursor:pointer;font-size:0.8rem;padding:0;line-height:1;
+  }
+  .acc-slot .slot-remove:hover{color:#ff6b6b;}
+
+  .acc-inv-heading{font-family:var(--font-display);font-size:0.72rem;letter-spacing:0.05em;color:#d898ff;margin:12px 0 8px;text-transform:uppercase;}
+  .acc-inv{display:flex;flex-direction:column;gap:7px;max-height:260px;overflow-y:auto;}
+  .acc-card{
+    display:flex;align-items:center;gap:10px;
+    background:rgba(191,79,255,0.08);border:1px solid rgba(191,79,255,0.22);
+    border-radius:10px;padding:9px 12px;
+  }
+  .acc-card .acc-icon{font-size:1.4rem;flex-shrink:0;}
+  .acc-card-info{flex:1;}
+  .acc-card-info strong{font-size:0.88rem;display:block;}
+  .acc-card-info span{font-size:0.7rem;color:#d898ff;font-family:var(--font-mono);}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{
+    padding:8px 12px;border-radius:20px;border:1px solid rgba(239,230,210,0.3);
+    background:transparent;color:var(--paper);font-family:var(--font-mono);font-size:0.72rem;cursor:pointer;
+  }
+  .chip.active{background:var(--glow);color:var(--ink);border-color:var(--glow);}
+  .chip:disabled{opacity:0.35;cursor:not-allowed;}
+
+  /* ---------- Footer & toasts ---------- */
+  .app-footer{display:flex;align-items:center;justify-content:space-between;margin-top:16px;font-size:0.74rem;opacity:0.6;font-family:var(--font-mono);}
+  .link-btn{background:none;border:none;color:var(--paper);font-family:var(--font-body);font-size:0.74rem;text-decoration:underline;cursor:pointer;opacity:0.85;}
+
+  .toast-stack{position:fixed;bottom:18px;right:18px;left:18px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:50;pointer-events:none;}
+  .toast{
+    background:var(--wood);color:var(--paper);padding:10px 14px;border-radius:10px;
+    font-size:0.82rem;box-shadow:var(--shadow-soft);border-left:4px solid var(--brass);
+    max-width:300px;animation:toastIn 0.25s ease-out,toastOut 0.25s ease-in forwards 2.55s;
+  }
+  .toast.good{border-left-color:var(--glow);}
+  .toast.legend{border-left-color:var(--glow);box-shadow:0 0 16px rgba(143,209,79,0.45);}
+  .toast.warn{border-left-color:#c0524a;}
+  .toast.acc{border-left-color:#bf4fff;box-shadow:0 0 16px rgba(191,79,255,0.4);}
+  @keyframes toastIn{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
+  @keyframes toastOut{to{opacity:0;transform:translateX(20px);}}
+
+  /* ---------- Screen shake ---------- */
+  @keyframes screenShake{
+    0%{transform:translate(0,0) rotate(0deg);}
+    10%{transform:translate(-6px,4px) rotate(-0.8deg);}
+    20%{transform:translate(7px,-5px) rotate(0.6deg);}
+    30%{transform:translate(-5px,6px) rotate(-0.5deg);}
+    40%{transform:translate(8px,-3px) rotate(0.9deg);}
+    50%{transform:translate(-7px,5px) rotate(-0.7deg);}
+    60%{transform:translate(5px,-6px) rotate(0.4deg);}
+    70%{transform:translate(-8px,3px) rotate(-0.6deg);}
+    80%{transform:translate(6px,4px) rotate(0.5deg);}
+    90%{transform:translate(-4px,-5px) rotate(-0.3deg);}
+    100%{transform:translate(0,0) rotate(0deg);}
+  }
+  body.shake-mild{animation:screenShake 0.45s ease-in-out;}
+  body.shake-hard{animation:screenShake 0.65s ease-in-out;}
+
+  @keyframes megaloPulse{
+    0%,100%{box-shadow:0 0 20px 4px rgba(191,79,255,0.45);}
+    50%{box-shadow:0 0 34px 10px rgba(191,79,255,0.75);}
+  }
+
+  /* --- Mutations --- */
+  .mutation-badge{
+    display:inline-flex;align-items:center;gap:3px;
+    font-size:0.68rem;font-family:var(--font-mono);
+    padding:2px 6px;border-radius:8px;margin-left:5px;
+    vertical-align:middle;border:1px solid;
+  }
+  @keyframes mutShimmer{
+    0%,100%{opacity:0.85;} 50%{opacity:1;filter:brightness(1.25);}
+  }
+  .fish-card.mutated{animation:mutShimmer 2s ease-in-out infinite;}
+
+  /* --- Rod visual previews --- */
+  .rod-visual{margin:6px 0 4px;height:36px;display:flex;align-items:center;}
+  .rod-visual svg{max-width:100%;height:36px;}
+  .bait-icon-wrap{display:inline-flex;align-items:center;margin-right:8px;vertical-align:middle;}
+  .bait-icon-wrap svg{width:36px;height:36px;}
+
+  /* Reel fish glow classes */
+  .fish-glow-common{filter:drop-shadow(0 0 4px rgba(156,169,166,0.9));}
+  .fish-glow-uncommon{filter:drop-shadow(0 0 5px rgba(79,182,168,0.9));}
+  .fish-glow-rare{filter:drop-shadow(0 0 6px rgba(199,145,60,0.95));}
+  .fish-glow-legendary{filter:drop-shadow(0 0 8px rgba(143,209,79,1)) drop-shadow(0 0 14px rgba(143,209,79,0.6));}
+  .fish-glow-megalodon{filter:drop-shadow(0 0 10px rgba(191,79,255,1)) drop-shadow(0 0 18px rgba(191,79,255,0.7));}
+  /* Abyss fish glows — deeper, colder, eerie */
+  .fish-glow-abyss-common{filter:drop-shadow(0 0 5px rgba(84,110,122,0.9));}
+  .fish-glow-abyss-uncommon{filter:drop-shadow(0 0 7px rgba(26,127,168,1)) drop-shadow(0 0 14px rgba(26,127,168,0.5));}
+  .fish-glow-abyss-rare{filter:drop-shadow(0 0 8px rgba(123,31,162,1)) drop-shadow(0 0 16px rgba(123,31,162,0.6));}
+  .fish-glow-abyss-legendary{filter:drop-shadow(0 0 10px rgba(198,40,40,1)) drop-shadow(0 0 20px rgba(198,40,40,0.7));}
+  .fish-glow-mutation-rain_blessed{filter:drop-shadow(0 0 8px rgba(79,195,247,1)) drop-shadow(0 0 16px rgba(79,195,247,0.6));}
+  .fish-glow-mutation-gilded{filter:drop-shadow(0 0 9px rgba(255,215,0,1)) drop-shadow(0 0 18px rgba(255,215,0,0.6));}
+  .fish-glow-mutation-void_touched{filter:drop-shadow(0 0 8px rgba(206,147,216,1)) drop-shadow(0 0 16px rgba(156,33,176,0.7));}
+  .fish-glow-mutation-frost_bitten{filter:drop-shadow(0 0 7px rgba(128,222,234,1)) drop-shadow(0 0 14px rgba(128,222,234,0.6));}
+  .fish-glow-mutation-blood_moon{filter:drop-shadow(0 0 10px rgba(255,112,67,1)) drop-shadow(0 0 20px rgba(255,112,67,0.7));}
+
+  /* ---- Boss fish ---- */
+  @keyframes bossAlertPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.18);}}
+  .alert-badge.boss-bite{background:#ff6d00;box-shadow:0 0 18px #ff6d00;animation:bossAlertPulse 0.4s ease-in-out infinite;}
+
+  .fish-card.rarity-boss{border-left-color:#ff6d00;color:#ff6d00;}
+  .fish-card.rarity-boss.boss-frozen{border-left-color:#80deea;color:#80deea;box-shadow:0 0 22px 5px rgba(128,222,234,0.5);}
+  .fish-card.rarity-boss.boss-magma{border-left-color:#ff5722;color:#ff5722;box-shadow:0 0 22px 5px rgba(255,87,34,0.55);}
+  .fish-card.rarity-boss.boss-angel{border-left-color:#fff176;color:#fff176;box-shadow:0 0 22px 5px rgba(255,241,118,0.5);}
+  .fish-card.rarity-boss.boss-permafrost{border-left-color:#00e5ff;color:#00e5ff;box-shadow:0 0 26px 6px rgba(0,229,255,0.6);}
+  .fish-card.rarity-boss.boss-swamp{border-left-color:#69f0ae;color:#69f0ae;box-shadow:0 0 26px 6px rgba(105,240,174,0.6);}
+  .fish-card.rarity-boss.boss-volcanic{border-left-color:#ff6e40;color:#ff6e40;box-shadow:0 0 28px 7px rgba(255,110,64,0.65);}
+  .fish-card.rarity-boss.boss-void{border-left-color:#ea80fc;color:#ea80fc;box-shadow:0 0 30px 8px rgba(234,128,252,0.7);}
+  @keyframes bossCardPulse{0%,100%{filter:brightness(1);}50%{filter:brightness(1.3);}}
+  .fish-card.rarity-boss{animation:bossCardPulse 2s ease-in-out infinite;}
+
+  /* Boss reel track flash */
+  .reel-track.boss-freeze-active{background:linear-gradient(180deg,#003d5e,#005f8a) !important;transition:background 0.3s;}
+  .reel-track.boss-surge-active{background:linear-gradient(180deg,#5e1000,#8a2000) !important;transition:background 0.3s;}
+  .reel-track.boss-reverse-active{background:linear-gradient(180deg,#4a4000,#6e6000) !important;transition:background 0.3s;}
+
+  /* Boss ability warning bar */
+  .boss-ability-bar{
+    width:100%;height:6px;border-radius:4px;overflow:hidden;
+    background:rgba(0,0,0,0.4);margin-bottom:4px;
+  }
+  .boss-ability-fill{height:100%;width:100%;border-radius:4px;transition:background 0.3s;}
+
+  .fish-glow-boss-frozen{filter:drop-shadow(0 0 10px rgba(128,222,234,1)) drop-shadow(0 0 20px rgba(128,222,234,0.7));}
+  .fish-glow-boss-magma{filter:drop-shadow(0 0 12px rgba(255,87,34,1)) drop-shadow(0 0 24px rgba(255,87,34,0.8));}
+  .fish-glow-boss-angel{filter:drop-shadow(0 0 12px rgba(255,241,118,1)) drop-shadow(0 0 24px rgba(255,241,118,0.8));}
+  .fish-glow-boss-permafrost{filter:drop-shadow(0 0 14px rgba(0,229,255,1)) drop-shadow(0 0 28px rgba(0,229,255,0.9));}
+  .fish-glow-boss-swamp{filter:drop-shadow(0 0 14px rgba(105,240,174,1)) drop-shadow(0 0 28px rgba(105,240,174,0.8));}
+  .fish-glow-boss-volcanic{filter:drop-shadow(0 0 16px rgba(255,110,64,1)) drop-shadow(0 0 32px rgba(255,110,64,0.9));}
+  .fish-glow-boss-void{filter:drop-shadow(0 0 18px rgba(234,128,252,1)) drop-shadow(0 0 36px rgba(234,128,252,0.9));}
+
+  @media(max-width:480px){
+    .pond{height:200px;}
+    .reel-track{height:120px;}
+    .progress-bar{max-width:280px;height:24px;}
+    .acc-slots{grid-template-columns:1fr 1fr;}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .bobber.idle-bob,.bobber.bite-dip,.ripple,.fish-card.rarity-megalodon{animation:none !important;}
+    body.shake-mild,body.shake-hard{animation:none !important;}
+  }
+
+  /* ---- Depth themes ---- */
+  @keyframes abyssFlicker{0%,100%{opacity:0.6;}50%{opacity:1;}}
+  @keyframes abyssFloat{0%{transform:translateY(0) scale(1);}50%{transform:translateY(-8px) scale(1.05);}100%{transform:translateY(0) scale(1);}}
+  @keyframes abyssGlow{0%,100%{box-shadow:inset 0 0 60px rgba(100,0,180,0.3),inset 0 0 120px rgba(0,0,60,0.6);}50%{box-shadow:inset 0 0 80px rgba(120,0,220,0.5),inset 0 0 140px rgba(0,0,80,0.7);}}
+
+  /* Abyss — whole page */
+  body.depth-abyss{
+    background:radial-gradient(ellipse at top, #0a0018 0%, #050008 60%, #000 100%) !important;
+    transition:background 1.2s ease;
+  }
+  body.depth-abyss .app-header{
+    background:linear-gradient(180deg,#1a0030,#0d0018) !important;
+    border-bottom-color:#9400d3 !important;
+    transition:background 1.2s, border-color 0.8s;
+  }
+  body.depth-abyss .app-header::before{
+    background-image:repeating-linear-gradient(90deg,rgba(148,0,211,0.12) 0 2px,transparent 2px 26px) !important;
+  }
+  body.depth-abyss .card{
+    background:linear-gradient(180deg,#0e0020,#060010) !important;
+    border-color:rgba(148,0,211,0.35) !important;
+    transition:background 1.2s, border-color 0.8s;
+  }
+  body.depth-abyss .pond{
+    background:linear-gradient(180deg,#080018 0%,#04000e 50%,#000 100%) !important;
+    animation:abyssGlow 3s ease-in-out infinite;
+    transition:background 1.2s;
+  }
+  body.depth-abyss .pond::before{
+    background:linear-gradient(90deg,#0a0018,#120024) !important;
+  }
+  body.depth-abyss .reel-track{
+    background:linear-gradient(180deg,#0a0020,#03000c) !important;
+  }
+  /* Abyss bioluminescent particles */
+  body.depth-abyss .pond::after{
+    content:'✦ ✦ · ✦ · ✦ ✦ · ✦';
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:space-around;
+    font-size:0.55rem;color:rgba(148,0,211,0.45);
+    letter-spacing:8px;pointer-events:none;z-index:1;
+    animation:abyssFlicker 2.5s ease-in-out infinite;
+    padding-left:14%;
+  }
+  body.depth-abyss .brand h1{color:#ce93d8 !important;}
+  body.depth-abyss .brand .tagline{color:rgba(206,147,216,0.6) !important;}
+  body.depth-abyss .coin-amount{color:#ce93d8 !important;}
+  body.depth-abyss .coin-icon circle:first-child{fill:#5e0080 !important;}
+  body.depth-abyss .wallet{background:rgba(148,0,211,0.15) !important;}
+  body.depth-abyss .btn-primary{
+    background:linear-gradient(135deg,#5e0080,#9400d3) !important;
+    border-color:#9400d3 !important;
+    box-shadow:0 0 18px rgba(148,0,211,0.5) !important;
+  }
+  body.depth-abyss .panel-heading{color:#ce93d8 !important;}
+  body.depth-abyss .app-footer{border-top-color:rgba(148,0,211,0.3) !important;}
+
+  /* Shore — lighter, warm daytime feel */
+  body.depth-shore{
+    background:radial-gradient(ellipse at top, #0d3a2e 0%, #082a22 60%, #051a14 100%) !important;
+    transition:background 1.2s ease;
+  }
+  body.depth-shore .pond{
+    background:linear-gradient(180deg,#1a7a6e 0%,#115e52 50%,#0a3d36 100%) !important;
+    box-shadow:inset 0 0 30px rgba(0,0,0,0.2),inset 0 -10px 30px rgba(79,182,168,0.15) !important;
+    transition:background 1.2s;
+  }
+  body.depth-shore .btn-primary{
+    background:linear-gradient(135deg,#1a6e5a,#4FB6A8) !important;
+    border-color:#4FB6A8 !important;
+  }
+  .depth-selector{display:flex;gap:6px;justify-content:center;margin-bottom:10px;}
+  .depth-btn{
+    flex:1;padding:7px 4px;border-radius:10px;border:1.5px solid rgba(199,145,60,0.25);
+    background:rgba(255,255,255,0.04);color:var(--paper-dim);
+    font-family:var(--font-body);font-size:0.72rem;cursor:pointer;
+    transition:all 0.2s;line-height:1.3;text-align:center;
+  }
+  .depth-btn:hover{border-color:rgba(199,145,60,0.5);background:rgba(199,145,60,0.08);}
+  .depth-btn.active{background:rgba(199,145,60,0.15);border-color:var(--brass);color:var(--paper);}
+  .depth-btn.active.shore{background:rgba(79,182,168,0.15);border-color:#4FB6A8;color:#4FB6A8;}
+  .depth-btn.active.open{background:rgba(199,145,60,0.15);border-color:var(--brass);color:var(--brass-light);}
+  .depth-btn.active.abyss{background:rgba(148,0,211,0.18);border-color:#9400d3;color:#ce93d8;}
+  .depth-label{font-size:0.8rem;font-weight:700;display:block;}
+  .depth-sub{font-size:0.65rem;opacity:0.7;display:block;margin-top:1px;}
+
+  /* ---- World system ---- */
+  .world-selector{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
+  .world-card{
+    display:flex;align-items:center;gap:12px;
+    background:rgba(0,0,0,0.22);border:1.5px solid rgba(199,145,60,0.25);
+    border-radius:12px;padding:10px 14px;cursor:pointer;transition:all 0.2s;
+  }
+  .world-card.active{border-color:var(--brass);background:rgba(199,145,60,0.1);box-shadow:0 0 14px rgba(199,145,60,0.2);}
+  .world-card.locked{opacity:0.6;cursor:default;}
+  .world-card:hover:not(.locked):not(.active){border-color:rgba(199,145,60,0.5);background:rgba(199,145,60,0.06);}
+  .world-emoji{font-size:1.6rem;flex-shrink:0;width:36px;text-align:center;}
+  .world-info{flex:1;}
+  .world-info strong{font-size:0.9rem;display:block;font-weight:700;}
+  .world-info span{font-size:0.7rem;opacity:0.65;font-family:var(--font-mono);}
+  .world-info .world-desc{font-size:0.72rem;opacity:0.55;margin-top:2px;display:block;}
+  .world-btn-area{flex-shrink:0;}
+
+  /* World-specific colors */
+  .world-card.world-frozen_tundra.active{border-color:#80deea;background:rgba(128,222,234,0.08);box-shadow:0 0 14px rgba(128,222,234,0.2);}
+  .world-card.world-haunted_bayou.active{border-color:#a5d6a7;background:rgba(75,160,80,0.08);box-shadow:0 0 14px rgba(75,160,80,0.15);}
+  .world-card.world-volcanic_rift.active{border-color:#ff5722;background:rgba(255,87,34,0.08);box-shadow:0 0 14px rgba(255,87,34,0.2);}
+  .world-card.world-celestial_sea.active{border-color:#ce93d8;background:rgba(206,147,216,0.08);box-shadow:0 0 14px rgba(206,147,216,0.2);}
+
+  /* === World themes === */
+
+  /* Frozen Tundra */
+  body.world-frozen_tundra{
+    background:radial-gradient(ellipse at top, #0a2a40 0%, #061a2a 55%, #020d15 100%) !important;
+    transition:background 1.2s ease;
+  }
+  body.world-frozen_tundra .app-header{background:linear-gradient(180deg,#0d3550,#082540) !important;border-bottom-color:#80deea !important;}
+  body.world-frozen_tundra .card{background:linear-gradient(180deg,#0d2a3e,#071a2c) !important;border-color:rgba(128,222,234,0.25) !important;}
+  body.world-frozen_tundra .pond{
+    background:linear-gradient(180deg,#0d4060 0%,#082a40 45%,#030f1c 100%) !important;
+    box-shadow:inset 0 0 60px rgba(0,180,255,0.12) !important;
+  }
+  body.world-frozen_tundra .pond::after{
+    content:'❄ · ❄ · ❄ · ❄ · ❄';
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:space-around;
+    font-size:0.6rem;color:rgba(128,222,234,0.3);letter-spacing:10px;pointer-events:none;z-index:1;
+    animation:abyssFlicker 3s ease-in-out infinite;padding-left:14%;
+  }
+  body.world-frozen_tundra .brand h1{color:#b2ebf2 !important;}
+  body.world-frozen_tundra .coin-amount{color:#80deea !important;}
+  body.world-frozen_tundra .panel-heading{color:#80deea !important;}
+  body.world-frozen_tundra .btn-primary{background:linear-gradient(180deg,#00838f,#006064) !important;box-shadow:0 4px 0 #002f38 !important;}
+  body.world-frozen_tundra .tab-btn.active{background:#006064 !important;color:#e0f7fa !important;}
+
+  /* Haunted Bayou */
+  body.world-haunted_bayou{
+    background:radial-gradient(ellipse at top, #0a1f0e 0%, #05120a 55%, #010804 100%) !important;
+    transition:background 1.2s ease;
+  }
+  body.world-haunted_bayou .app-header{background:linear-gradient(180deg,#122010,#0a180a) !important;border-bottom-color:#4caf50 !important;}
+  body.world-haunted_bayou .card{background:linear-gradient(180deg,#0e1e0c,#081208) !important;border-color:rgba(76,175,80,0.25) !important;}
+  body.world-haunted_bayou .pond{
+    background:linear-gradient(180deg,#142e12 0%,#0a1e08 45%,#020a02 100%) !important;
+    box-shadow:inset 0 0 60px rgba(0,80,0,0.4) !important;
+  }
+  body.world-haunted_bayou .pond::after{
+    content:'👻 · 💀 · 👁 · 💀 · 👻';
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:space-around;
+    font-size:0.55rem;color:rgba(165,214,167,0.2);letter-spacing:8px;pointer-events:none;z-index:1;
+    animation:abyssFlicker 4s ease-in-out infinite;padding-left:14%;
+  }
+  body.world-haunted_bayou .brand h1{color:#a5d6a7 !important;}
+  body.world-haunted_bayou .coin-amount{color:#81c784 !important;}
+  body.world-haunted_bayou .panel-heading{color:#81c784 !important;}
+  body.world-haunted_bayou .btn-primary{background:linear-gradient(180deg,#2e7d32,#1b5e20) !important;box-shadow:0 4px 0 #0a2e0a !important;}
+  body.world-haunted_bayou .tab-btn.active{background:#1b5e20 !important;color:#c8e6c9 !important;}
+
+  /* Volcanic Rift */
+  body.world-volcanic_rift{
+    background:radial-gradient(ellipse at top, #2a0a00 0%, #1a0500 55%, #0d0200 100%) !important;
+    transition:background 1.2s ease;
+  }
+  body.world-volcanic_rift .app-header{background:linear-gradient(180deg,#3e1000,#2a0800) !important;border-bottom-color:#ff5722 !important;}
+  body.world-volcanic_rift .card{background:linear-gradient(180deg,#2a0a00,#1a0500) !important;border-color:rgba(255,87,34,0.28) !important;}
+  body.world-volcanic_rift .pond{
+    background:linear-gradient(180deg,#3d1200 0%,#240800 45%,#0f0200 100%) !important;
+    box-shadow:inset 0 0 60px rgba(255,60,0,0.2),inset 0 20px 40px rgba(255,150,0,0.08) !important;
+  }
+  body.world-volcanic_rift .pond::after{
+    content:'🔥 · 🌋 · 🔥 · 🌋 · 🔥';
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:space-around;
+    font-size:0.55rem;color:rgba(255,100,30,0.25);letter-spacing:8px;pointer-events:none;z-index:1;
+    animation:abyssFlicker 1.8s ease-in-out infinite;padding-left:14%;
+  }
+  body.world-volcanic_rift .brand h1{color:#ffccbc !important;}
+  body.world-volcanic_rift .coin-amount{color:#ff7043 !important;}
+  body.world-volcanic_rift .panel-heading{color:#ff7043 !important;}
+  body.world-volcanic_rift .btn-primary{background:linear-gradient(180deg,#e64a19,#bf360c) !important;box-shadow:0 4px 0 #6d1a06 !important;}
+  body.world-volcanic_rift .tab-btn.active{background:#bf360c !important;color:#ffccbc !important;}
+
+  /* Celestial Sea */
+  @keyframes starTwinkle{0%,100%{opacity:0.4;} 50%{opacity:1;}}
+  body.world-celestial_sea{
+    background:radial-gradient(ellipse at top, #0a0028 0%, #050014 55%, #02000a 100%) !important;
+    transition:background 1.2s ease;
+  }
+  body.world-celestial_sea .app-header{background:linear-gradient(180deg,#14004a,#0a0030) !important;border-bottom-color:#ce93d8 !important;}
+  body.world-celestial_sea .card{background:linear-gradient(180deg,#10003a,#08001e) !important;border-color:rgba(206,147,216,0.28) !important;}
+  body.world-celestial_sea .pond{
+    background:linear-gradient(180deg,#180050 0%,#0c0030 45%,#040014 100%) !important;
+    box-shadow:inset 0 0 80px rgba(100,0,200,0.25),inset 0 0 140px rgba(50,0,100,0.5) !important;
+  }
+  body.world-celestial_sea .pond::after{
+    content:'✦ · ★ · ✦ · ☆ · ✦ · ★ · ✦';
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:space-around;
+    font-size:0.5rem;color:rgba(206,147,216,0.45);letter-spacing:6px;pointer-events:none;z-index:1;
+    animation:starTwinkle 2s ease-in-out infinite;padding-left:14%;
+  }
+  body.world-celestial_sea .brand h1{color:#e1bee7 !important;}
+  body.world-celestial_sea .coin-amount{color:#ce93d8 !important;}
+  body.world-celestial_sea .panel-heading{color:#ce93d8 !important;}
+  body.world-celestial_sea .btn-primary{background:linear-gradient(180deg,#7b1fa2,#4a148c) !important;box-shadow:0 4px 0 #1a0050 !important;}
+  body.world-celestial_sea .tab-btn.active{background:#4a148c !important;color:#e1bee7 !important;}
+  body.world-celestial_sea .reel-track{background:linear-gradient(180deg,#0a0028,#040014) !important;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark">🎣</span>
+      <div>
+        <h1>Dockside</h1>
+        <p class="tagline">a lazy afternoon of fishing</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="active-gear" id="activeGear"></div>
+      <div class="wallet">
+        <svg class="coin-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#C7913C" stroke="#E2B563" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#E2B563" stroke-width="1"/></svg>
+        <span class="coin-amount" id="coinAmount">0</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="card pond-card">
+      <div class="pond" id="pond" aria-label="Fishing pond">
+        <div class="ripples" id="ripples"></div>
+        <div class="bobber" id="bobber"></div>
+        <div class="alert-badge" id="alertBadge">!</div>
+      </div>
+
+      <p class="rig-info"><span id="rodLabel">Bent Twig</span> &nbsp;·&nbsp; <span id="baitLabel">Garden Worms</span></p>
+      <p class="status-text" id="statusText">Ready when you are. Cast your line to begin.</p>
+
+      <div class="action-zone" id="actionZone">
+        <div id="castWrap">
+          <div class="depth-selector" id="depthSelector">
+            <button class="depth-btn active shore" data-depth="shore">
+              <span class="depth-label">🏖️ Shore</span>
+              <span class="depth-sub">Fast bites · Common fish</span>
+            </button>
+            <button class="depth-btn open" data-depth="open">
+              <span class="depth-label">🌊 Open Water</span>
+              <span class="depth-sub">Balanced · All rarities</span>
+            </button>
+            <button class="depth-btn abyss" data-depth="abyss">
+              <span class="depth-label">🌑 The Abyss</span>
+              <span class="depth-sub">Slow bites · Bosses lurk here</span>
+            </button>
+          </div>
+          <button class="btn btn-primary" id="castBtn">Cast Line</button>
+        </div>
+
+        <div id="hookWrap" class="hook-zone hidden">
+          <div class="hook-timer"><div class="hook-timer-fill" id="hookTimerFill"></div></div>
+          <button class="btn btn-accent" id="hookBtn">Hook it!</button>
+        </div>
+
+        <div id="reelWrap" class="reel-rig hidden">
+          <div class="boss-ability-bar hidden" id="bossAbilityBar"><div class="boss-ability-fill" id="bossAbilityFill"></div></div>
+          <div class="reel-inner">
+            <div class="reel-track" id="reelTrack">
+              <div class="catch-zone" id="catchZone"></div>
+              <div class="fish-marker" id="fishMarker"></div>
+            </div>
+            <div class="reel-controls">
+              <button class="btn btn-primary btn-small reel-btn" id="reelBtn">Hold to Reel</button>
+            </div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div><span class="progress-label">TENSION</span></div>
+        </div>
+      </div>
+
+      <p class="hint" id="hintText">Tip: hold the button to pull the fish into the glowing zone — release to ease off.</p>
+    </section>
+
+    <section class="card panel-card">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="cooler">Cooler</button>
+        <button class="tab-btn" data-tab="shop">Tackle</button>
+        <button class="tab-btn tab-acc" data-tab="accessories">Gear ✦</button>
+        <button class="tab-btn" data-tab="worlds">🗺️ Worlds</button>
+      </div>
+
+      <!-- Cooler -->
+      <div class="tab-panel" id="coolerPanel">
+        <div class="cooler-summary">
+          <span id="fishCount">0 fish · 0c</span>
+          <button class="btn btn-brass btn-small" id="sellAllBtn">Sell All</button>
+        </div>
+        <ul class="fish-list" id="fishList"></ul>
+      </div>
+
+      <!-- Tackle Shop -->
+      <div class="tab-panel hidden" id="shopPanel">
+        <h2 class="panel-heading">Rods</h2>
+        <div class="card-list" id="rodList"></div>
+        <h2 class="panel-heading">Bait</h2>
+        <div class="card-list" id="baitList"></div>
+        <h2 class="panel-heading">Equip Bait</h2>
+        <div class="chip-row" id="baitChips"></div>
+      </div>
+
+      <!-- Accessories -->
+      <div class="tab-panel hidden" id="accessoriesPanel">
+        <h2 class="panel-heading purple">Equipped Gear <span style="font-size:0.65rem;opacity:0.6">(3 slots)</span></h2>
+        <div class="acc-slots" id="accSlots"></div>
+        <div class="acc-inv-heading">Your Collection</div>
+        <div class="acc-inv" id="accInv"></div>
+        <p style="font-size:0.7rem;opacity:0.5;margin:10px 0 0;font-style:italic;text-align:center;">Accessories are found while fishing — keep an eye on the pond!</p>
+      </div>
+
+      <!-- Worlds -->
+      <div class="tab-panel hidden" id="worldsPanel">
+        <h2 class="panel-heading">Fishing Worlds</h2>
+        <p style="font-size:0.72rem;opacity:0.6;margin:0 0 12px;">Each world holds unique fish and a distinct atmosphere. Unlock new ones to explore rarer waters.</p>
+        <div class="world-selector" id="worldList"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span id="lifetimeStats">0 fish caught lifetime</span>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="link-btn" id="exportBtn">Export Save</button>
+      <button class="link-btn" id="importBtn">Import Save</button>
+      <button class="link-btn" id="resetBtn">Reset</button>
+    </div>
+  </footer>
+</div>
+
+<!-- Save import/export modal -->
+<div id="saveModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:#1a3035;border:2px solid var(--brass);border-radius:16px;padding:24px;max-width:520px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+    <h2 id="modalTitle" style="font-family:var(--font-display);font-size:1rem;letter-spacing:0.06em;margin:0 0 10px;color:var(--brass-light);text-transform:uppercase;"></h2>
+    <p id="modalDesc" style="font-size:0.8rem;opacity:0.7;margin:0 0 12px;"></p>
+    <textarea id="saveDataBox" rows="6" style="width:100%;background:#0d2428;border:1px solid rgba(199,145,60,0.35);border-radius:8px;padding:10px;color:var(--paper);font-family:var(--font-mono);font-size:0.72rem;resize:vertical;box-sizing:border-box;"></textarea>
+    <div style="display:flex;gap:10px;margin-top:12px;justify-content:flex-end;">
+      <button class="btn btn-ghost btn-small" id="modalCancel">Cancel</button>
+      <button class="btn btn-primary btn-small" id="modalAction"></button>
+    </div>
+  </div>
+
+<div class="toast-stack" id="toastStack"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ===================== Game data ===================== */
+
+  var RODS = [
+    {
+      name:"Bent Twig", cost:0, zoneSize:26, pullSpeed:55, fillBonus:0, hookWindow:850,
+      desc:"Better than fishing with your hands.",
+      world:null,
+      bobberColor:"radial-gradient(circle at 35% 30%,#fff,#d4453f 60%,#8e1f1f)", popperAccent:"#d4453f"
+    },
+    {
+      name:"Cane Pole", cost:40, zoneSize:32, pullSpeed:62, fillBonus:2, hookWindow:1000,
+      desc:"A classic starter. Wider zone, steadier bites.",
+      world:null,
+      bobberColor:"radial-gradient(circle at 35% 30%,#fff,#b8860b 60%,#8B6914)", popperAccent:"#C7913C"
+    },
+    {
+      name:"Fiberglass Rod", cost:200, zoneSize:38, pullSpeed:70, fillBonus:4, hookWindow:1200,
+      desc:"Sturdy, forgiving, dependable. Good all-rounder.",
+      world:null,
+      bobberColor:"radial-gradient(circle at 35% 30%,#fff,#2e7d32 60%,#1a4b1d)", popperAccent:"#4CAF50"
+    },
+    {
+      name:"Graphite Pro", cost:650, zoneSize:46, pullSpeed:82, fillBonus:6, hookWindow:1400,
+      desc:"Tournament-grade. Snappier reels, bigger zone.",
+      world:null,
+      bobberColor:"radial-gradient(circle at 35% 30%,#fff,#1565c0 60%,#0d3d73)", popperAccent:"#42A5F5"
+    },
+    {
+      name:"Deep Sea Titan", cost:1800, zoneSize:52, pullSpeed:94, fillBonus:8, hookWindow:1650,
+      desc:"Built for monsters. Handles the worst fights.",
+      world:null,
+      bobberColor:"radial-gradient(circle at 35% 30%,#fff,#6a1b9a 60%,#3d0d5e)", popperAccent:"#ab47bc"
+    },
+    {
+      name:"Golden Angler", cost:5000, zoneSize:62, pullSpeed:108, fillBonus:12, hookWindow:2000,
+      desc:"Said to charm the water itself. The ultimate rod.",
+      world:null,
+      bobberColor:"radial-gradient(circle at 35% 30%,#fff8e1,#E2B563 55%,#9a6b1a)", popperAccent:"#E2B563"
+    },
+    {
+      name:"Frost Spine", cost:8000, zoneSize:78, pullSpeed:68, fillBonus:6, hookWindow:2200,
+      desc:"Crystallised leviathan ice. Enormous zone, bone-cold patience.",
+      world:null,
+      bobberColor:"radial-gradient(circle at 35% 30%,#e0f7fa,#80deea 55%,#00838f)", popperAccent:"#80deea"
+    },
+    {
+      name:"Magma Core", cost:12000, zoneSize:58, pullSpeed:160, fillBonus:20, hookWindow:1800,
+      desc:"A rod forged in volcanic rock. Reels like a raging current.",
+      world:null,
+      bobberColor:"radial-gradient(circle at 35% 30%,#fff,#ff7043 55%,#bf360c)", popperAccent:"#ff5722"
+    },
+    {
+      name:"Seraph's Staff", cost:25000, zoneSize:82, pullSpeed:130, fillBonus:18, hookWindow:2800,
+      desc:"Divine light made solid. Bosses tremble. Nothing escapes.",
+      world:null,
+      bobberColor:"radial-gradient(circle at 35% 30%,#fff,#fff176 55%,#f9a825)", popperAccent:"#fff176"
+    },
+    // === Frozen Tundra world rods (indices 9-11) ===
+    {
+      name:"Permafrost Pole", cost:12000, zoneSize:50, pullSpeed:75, fillBonus:8, hookWindow:1600,
+      desc:"Carved from glacial bone. Built for tundra beasts.",
+      world:"frozen_tundra",
+      bobberColor:"radial-gradient(circle at 35% 30%,#e0f7fa,#4fc3f7 60%,#01579b)", popperAccent:"#4fc3f7"
+    },
+    {
+      name:"Blizzard Lance", cost:35000, zoneSize:66, pullSpeed:105, fillBonus:14, hookWindow:2100,
+      desc:"A lance of frozen lightning. Exceptional speed in icy waters.",
+      world:"frozen_tundra",
+      bobberColor:"radial-gradient(circle at 35% 30%,#fff,#b2ebf2 60%,#00838f)", popperAccent:"#b2ebf2"
+    },
+    {
+      name:"Wyrm Spine Rod", cost:90000, zoneSize:88, pullSpeed:120, fillBonus:22, hookWindow:3000,
+      desc:"Forged from the spine of the Ice Wyrm. Legendary tundra mastery.",
+      world:"frozen_tundra",
+      bobberColor:"radial-gradient(circle at 35% 30%,#e0f7fa,#fff 55%,#80deea)", popperAccent:"#fff"
+    },
+    // === Haunted Bayou world rods (indices 12-14) ===
+    {
+      name:"Swamp Driftwood", cost:80000, zoneSize:55, pullSpeed:85, fillBonus:10, hookWindow:1800,
+      desc:"Ancient gnarled wood, touched by bayou spirits.",
+      world:"haunted_bayou",
+      bobberColor:"radial-gradient(circle at 35% 30%,#a5d6a7,#2e7d32 60%,#1b5e20)", popperAccent:"#4caf50"
+    },
+    {
+      name:"Specter Rod", cost:250000, zoneSize:70, pullSpeed:115, fillBonus:16, hookWindow:2300,
+      desc:"Semi-transparent. Ghosts mistake it for one of their own.",
+      world:"haunted_bayou",
+      bobberColor:"radial-gradient(circle at 35% 30%,rgba(255,255,255,0.9),#c8e6c9 55%,#388e3c)", popperAccent:"#a5d6a7"
+    },
+    {
+      name:"Reaper's Crook", cost:650000, zoneSize:90, pullSpeed:135, fillBonus:24, hookWindow:3200,
+      desc:"Wielded by the bayou's own reaper. No fish can refuse it.",
+      world:"haunted_bayou",
+      bobberColor:"radial-gradient(circle at 35% 30%,#dcedc8,#8bc34a 55%,#33691e)", popperAccent:"#dcedc8"
+    },
+    // === Volcanic Rift world rods (indices 15-17) ===
+    {
+      name:"Obsidian Shaft", cost:500000, zoneSize:60, pullSpeed:130, fillBonus:18, hookWindow:2000,
+      desc:"Cut from volcanic glass. Razor-fast, red-hot.",
+      world:"volcanic_rift",
+      bobberColor:"radial-gradient(circle at 35% 30%,#ffccbc,#ff5722 55%,#bf360c)", popperAccent:"#ff5722"
+    },
+    {
+      name:"Pyroclast Rod", cost:1500000, zoneSize:76, pullSpeed:175, fillBonus:28, hookWindow:2400,
+      desc:"Glows with internal magma. The fish feel its heat and panic.",
+      world:"volcanic_rift",
+      bobberColor:"radial-gradient(circle at 35% 30%,#ff8a65,#ff3d00 55%,#7f0000)", popperAccent:"#ff8a65"
+    },
+    {
+      name:"Dragon Spine", cost:4000000, zoneSize:94, pullSpeed:190, fillBonus:35, hookWindow:3500,
+      desc:"A spine ripped from the Volcanic Dragon itself. Absurd power.",
+      world:"volcanic_rift",
+      bobberColor:"radial-gradient(circle at 35% 30%,#fff,#ff9800 55%,#bf360c)", popperAccent:"#ff9800"
+    },
+    // === Celestial Sea world rods (indices 18-20) ===
+    {
+      name:"Stardust Wand", cost:3000000, zoneSize:72, pullSpeed:155, fillBonus:26, hookWindow:2600,
+      desc:"Trails cosmic dust. Fish from beyond the stars are drawn to it.",
+      world:"celestial_sea",
+      bobberColor:"radial-gradient(circle at 35% 30%,#e1bee7,#9c27b0 55%,#4a148c)", popperAccent:"#ce93d8"
+    },
+    {
+      name:"Nebula Pike", cost:9000000, zoneSize:86, pullSpeed:200, fillBonus:38, hookWindow:3200,
+      desc:"Made of compressed nebula gas. Its zone is nearly the full track.",
+      world:"celestial_sea",
+      bobberColor:"radial-gradient(circle at 35% 30%,#b39ddb,#7e57c2 55%,#1a237e)", popperAccent:"#b39ddb"
+    },
+    {
+      name:"Void Tendril", cost:25000000, zoneSize:100, pullSpeed:240, fillBonus:50, hookWindow:4000,
+      desc:"A strand of the void itself. Maximum zone. Maximum everything.",
+      world:"celestial_sea",
+      bobberColor:"radial-gradient(circle at 35% 30%,#fff,#ce93d8 40%,#1a0040)", popperAccent:"#fff"
+    }
+  ];
+
+  var BAITS = [
+    {
+      key:"worms", name:"Garden Worms", cost:0, perPack:0, infinite:true,
+      wait:[1400,3600], desc:"Free and unlimited. Slow but steady.",
+      weights:{common:78,uncommon:18,rare:3.5,legendary:0.5}
+    },
+    {
+      key:"cricket", name:"Cricket Bait", cost:25, perPack:6, infinite:false,
+      wait:[1100,3000], desc:"Livelier action. Noticeably more uncommons.",
+      weights:{common:62,uncommon:28,rare:8,legendary:2}
+    },
+    {
+      key:"minnow", name:"Live Minnows", cost:80, perPack:6, infinite:false,
+      wait:[800,2200], desc:"Big fish start paying attention. Faster bites too.",
+      weights:{common:42,uncommon:36,rare:17,legendary:5}
+    },
+    {
+      key:"goldenroe", name:"Golden Roe", cost:280, perPack:5, infinite:false,
+      wait:[550,1600], desc:"Legends bite. Very fast, very rewarding.",
+      weights:{common:18,uncommon:32,rare:37,legendary:13}
+    },
+    {
+      key:"deepchum", name:"Deep Sea Chum", cost:700, perPack:4, infinite:false,
+      wait:[400,1200], desc:"Something ancient is attracted to this. Ultra-fast bites, top-tier rarities.",
+      weights:{common:8,uncommon:22,rare:42,legendary:28}
+    },
+    {
+      key:"glowlure", name:"Bioluminescent Lure", cost:1500, perPack:3, infinite:false,
+      wait:[300,900], desc:"Hand-crafted lure that glows in the deep. Highest legendary rates. Rare bait chance too.",
+      weights:{common:5,uncommon:15,rare:35,legendary:45},
+      world:null
+    },
+    // === World-exclusive baits ===
+    {
+      key:"glacier_roe", name:"Glacier Roe", cost:800, perPack:4, infinite:false,
+      wait:[350,1000], desc:"Preserved in ice. Irresistible to tundra creatures. Best in Frozen Tundra.",
+      weights:{common:10,uncommon:25,rare:40,legendary:25},
+      world:"frozen_tundra"
+    },
+    {
+      key:"spirit_moth", name:"Spirit Moth", cost:600, perPack:4, infinite:false,
+      wait:[400,1100], desc:"A ghostly moth that lures bayou specters from the fog.",
+      weights:{common:8,uncommon:28,rare:38,legendary:26},
+      world:"haunted_bayou"
+    },
+    {
+      key:"magma_grub", name:"Magma Grub", cost:1200, perPack:3, infinite:false,
+      wait:[250,800], desc:"A heat-resistant larva. Volcanic fish can't resist. Ultra-fast.",
+      weights:{common:5,uncommon:18,rare:42,legendary:35},
+      world:"volcanic_rift"
+    },
+    {
+      key:"void_crystal", name:"Void Crystal", cost:5000, perPack:2, infinite:false,
+      wait:[200,600], desc:"A crystallised fragment of the void. Cosmic fish swarm it. Incredible rates.",
+      weights:{common:2,uncommon:10,rare:35,legendary:53},
+      world:"celestial_sea"
+    }
+  ];
+  var BAITS_BY_KEY = {};
+  BAITS.forEach(function(b){ BAITS_BY_KEY[b.key] = b; });
+
+  var FISH = {
+    common:[
+      {name:"Bluegill", v:[2,5], w:[0.2,0.8]},
+      {name:"Yellow Perch", v:[3,6], w:[0.3,1.0]},
+      {name:"Mudskipper", v:[1,4], w:[0.1,0.4]},
+      {name:"Sunfish", v:[2,6], w:[0.2,0.9]},
+      {name:"Rock Bass", v:[3,7], w:[0.4,1.2]}
+    ],
+    uncommon:[
+      {name:"Largemouth Bass", v:[10,20], w:[1,4]},
+      {name:"Rainbow Trout", v:[12,22], w:[1,3]},
+      {name:"Channel Catfish", v:[14,24], w:[2,5]},
+      {name:"Walleye", v:[11,21], w:[1.5,4.5]},
+      {name:"Crappie", v:[9,18], w:[0.8,2.5]}
+    ],
+    rare:[
+      {name:"Northern Pike", v:[40,70], w:[4,10]},
+      {name:"Lake Sturgeon", v:[50,90], w:[8,20]},
+      {name:"Muskellunge", v:[60,100], w:[6,18]},
+      {name:"Colossal Carp", v:[45,80], w:[10,25]},
+      {name:"Albino Catfish", v:[70,120], w:[12,30]}
+    ],
+    legendary:[
+      {name:"Golden Koi", v:[200,350], w:[5,15]},
+      {name:"Ancient Leviathan", v:[400,650], w:[30,80]},
+      {name:"Phantom Eel", v:[300,480], w:[8,22]},
+      {name:"Crimson Dragon Fish", v:[500,800], w:[20,55]},
+      {name:"Abyssal Shark", v:[350,600], w:[40,100]}
+    ],
+    megalodon:[
+      {name:"The Megalodon", v:[2500,5000], w:[800,1800]}
+    ]
+  };
+
+  /* ---- Abyss-exclusive fish (only catchable in The Abyss depth) ---- */
+  var ABYSS_FISH = {
+    common:[
+      {name:"Lanternfish",   v:[18,40],  w:[0.1,0.3]},
+      {name:"Hatchetfish",   v:[22,45],  w:[0.1,0.4]},
+      {name:"Viperfish",     v:[30,55],  w:[0.3,0.8]},
+      {name:"Bristlemouth",  v:[15,35],  w:[0.05,0.2]},
+      {name:"Stoplight Fish",v:[25,50],  w:[0.2,0.5]}
+    ],
+    uncommon:[
+      {name:"Dragonfish",    v:[80,160],  w:[0.8,3]},
+      {name:"Barreleye",     v:[70,140],  w:[0.5,2]},
+      {name:"Fangtooth",     v:[90,170],  w:[1,4]},
+      {name:"Gulper Eel",    v:[100,200], w:[3,10]},
+      {name:"Blobfish",      v:[60,130],  w:[2,8]}
+    ],
+    rare:[
+      {name:"Frilled Shark",  v:[280,550], w:[12,40]},
+      {name:"Oarfish",        v:[350,700], w:[25,80]},
+      {name:"Vampire Squid",  v:[240,480], w:[4,16]},
+      {name:"Anglerfish",     v:[320,620], w:[8,28]},
+      {name:"Giant Amphipod", v:[200,420], w:[2,10]}
+    ],
+    legendary:[
+      {name:"Goblin Shark",        v:[900,1800],  w:[60,180]},
+      {name:"Colossal Squid",      v:[1200,2500], w:[150,400]},
+      {name:"Pacific Sleeper Shark",v:[1000,2200], w:[100,300]},
+      {name:"Dumbo Octopus",       v:[800,1600],  w:[8,30]},
+      {name:"Deep Sea Chimera",    v:[1400,2800], w:[20,70]}
+    ],
+    megalodon:[
+      {name:"The Megalodon", v:[2500,5000], w:[800,1800]}
+    ]
+  };
+
+  /* Accessories: found while fishing */
+  var ACCESSORIES = [
+    {
+      key:"fishermans_hat", name:"Fisherman's Hat", icon:"🎩", rarity:"uncommon",
+      desc:"A lucky cap that boosts coin earnings.",
+      effect:"sellBonus", value:1.2,
+      effectLabel:"+20% sell value"
+    },
+    {
+      key:"lucky_lure", name:"Lucky Lure", icon:"🪝", rarity:"rare",
+      desc:"An old lucky lure that attracts better fish.",
+      effect:"rarityUp", value:0.08,
+      effectLabel:"+8% chance for higher rarity"
+    },
+    {
+      key:"rubber_boots", name:"Rubber Boots", icon:"🥾", rarity:"common",
+      desc:"Keeps your feet dry. Hooks feel snappier somehow.",
+      effect:"hookWindow", value:1.35,
+      effectLabel:"+35% hook window time"
+    },
+    {
+      key:"lucky_coin", name:"Lucky Coin", icon:"🪙", rarity:"uncommon",
+      desc:"A worn coin. Things just feel luckier.",
+      effect:"megalodonChance", value:2.0,
+      effectLabel:"2× Megalodon chance"
+    },
+    {
+      key:"captains_coat", name:"Captain's Coat", icon:"🧥", rarity:"rare",
+      desc:"An old captain's coat. Helps you reel faster.",
+      effect:"pullSpeed", value:1.25,
+      effectLabel:"+25% reel speed"
+    },
+    {
+      key:"sea_compass", name:"Sea Compass", icon:"🧭", rarity:"rare",
+      desc:"An ancient navigator's compass. Reduces wait time.",
+      effect:"waitReduction", value:0.65,
+      effectLabel:"−35% bite wait time"
+    },
+    {
+      key:"pearl_ring", name:"Pearl Ring", icon:"💍", rarity:"legendary",
+      desc:"Radiates an eerie glow. Massively boosts sell value.",
+      effect:"sellBonus", value:1.6,
+      effectLabel:"+60% sell value"
+    },
+    {
+      key:"ancient_reel", name:"Ancient Reel", icon:"⚙️", rarity:"legendary",
+      desc:"A mysterious reel from a sunken ship. Larger catch zone.",
+      effect:"zoneBonus", value:14,
+      effectLabel:"+14% catch zone size"
+    },
+    {
+      key:"tide_amulet", name:"Tide Amulet", icon:"🌊", rarity:"legendary",
+      desc:"Pulsing with ocean energy. The fish fill the bar faster.",
+      effect:"fillBonus", value:8,
+      effectLabel:"+8 fill rate"
+    },
+    {
+      key:"fishermans_glove", name:"Fishing Gloves", icon:"🧤", rarity:"common",
+      desc:"Worn gloves. Slightly wider catch zone.",
+      effect:"zoneBonus", value:5,
+      effectLabel:"+5% catch zone size"
+    },
+    {
+      key:"sunglasses", name:"Polarized Shades", icon:"🕶️", rarity:"uncommon",
+      desc:"You can spot fish movement before they bite.",
+      effect:"hookWindow", value:1.5,
+      effectLabel:"+50% hook window time"
+    },
+    {
+      key:"tackle_box", name:"Master Tackle Box", icon:"🗃️", rarity:"rare",
+      desc:"Keeps bait fresher. Each pack gives +2 extra uses.",
+      effect:"baitBonus", value:2,
+      effectLabel:"+2 bait per pack"
+    }
+  ];
+  var ACC_BY_KEY = {};
+  ACCESSORIES.forEach(function(a){ ACC_BY_KEY[a.key] = a; });
+
+  /* Drop pool for accessories while fishing (weighted by rarity) */
+  var ACC_DROP_POOL = [
+    {key:"rubber_boots", w:18}, {key:"fishermans_glove", w:20},
+    {key:"fishermans_hat", w:14}, {key:"lucky_coin", w:13}, {key:"sunglasses", w:12},
+    {key:"lucky_lure", w:8}, {key:"captains_coat", w:7}, {key:"sea_compass", w:6},
+    {key:"tackle_box", w:5},
+    {key:"pearl_ring", w:2}, {key:"ancient_reel", w:2}, {key:"tide_amulet", w:2}
+  ];
+
+  var DIFFICULTY = {
+    common:   {wanderMin:800,  wanderMax:1400, lerp:0.055, drain:14},
+    uncommon: {wanderMin:600,  wanderMax:1100, lerp:0.07,  drain:18},
+    rare:     {wanderMin:420,  wanderMax:800,  lerp:0.09,  drain:24},
+    legendary:{wanderMin:260,  wanderMax:550,  lerp:0.12,  drain:32},
+    megalodon:{wanderMin:120,  wanderMax:260,  lerp:0.18,  drain:46},
+    boss:     {wanderMin:100,  wanderMax:220,  lerp:0.17,  drain:38},
+    accessory:{wanderMin:700,  wanderMax:1300, lerp:0.060, drain:14}
+  };
+  var BASE_FILL = 6;
+  var GRAVITY = 68;
+
+  /* ===================== Bosses ===================== */
+  var BOSSES = [
+    {
+      key:"frozen_leviathan", name:"Frozen Leviathan", emoji:"🧊",
+      v:[1800,3500], w:[250,600],
+      color:"#80deea", glowClass:"fish-glow-boss-frozen", cardClass:"boss-frozen",
+      trackClass:"boss-freeze-active",
+      abilityName:"FROSTBITE", abilityColor:"#80deea",
+      abilityEffect:"freeze",   // progress drains even when fish in zone
+      abilityDesc:"❄️ FROSTBITE — the line is freezing over!",
+      cooldownMin:4500, cooldownMax:7000, duration:2800,
+      chance:0.0014, world:null
+    },
+    {
+      key:"magma_leviathan", name:"Magma Leviathan", emoji:"🔥",
+      v:[2500,5000], w:[350,800],
+      color:"#ff5722", glowClass:"fish-glow-boss-magma", cardClass:"boss-magma",
+      trackClass:"boss-surge-active",
+      abilityName:"MAGMA SURGE", abilityColor:"#ff5722",
+      abilityEffect:"surge",    // fish teleports + triple drain
+      abilityDesc:"🔥 MAGMA SURGE — it's going berserk!",
+      cooldownMin:3000, cooldownMax:5500, duration:2000,
+      chance:0.0011, world:null
+    },
+    {
+      key:"angel_anglerfish", name:"Angel Anglerfish", emoji:"👼",
+      v:[4000,7500], w:[60,150],
+      color:"#fff176", glowClass:"fish-glow-boss-angel", cardClass:"boss-angel",
+      trackClass:"boss-reverse-active",
+      abilityName:"DIVINE LURE", abilityColor:"#fff176",
+      abilityEffect:"reverse",  // hold moves zone DOWN, release moves UP
+      abilityDesc:"✨ DIVINE LURE — controls reversed!",
+      cooldownMin:5000, cooldownMax:8000, duration:3500,
+      chance:0.0008, world:null
+    },
+    // === Frozen Tundra exclusive boss ===
+    {
+      key:"permafrost_wyrm", name:"Permafrost Wyrm", emoji:"🐉",
+      v:[6000,12000], w:[800,2000],
+      color:"#00e5ff", glowClass:"fish-glow-boss-permafrost", cardClass:"boss-permafrost",
+      trackClass:"boss-freeze-active",
+      abilityName:"GLACIAL LOCK", abilityColor:"#00e5ff",
+      abilityEffect:"freeze",
+      abilityDesc:"🐉 GLACIAL LOCK — the line is turning to ice!",
+      cooldownMin:2500, cooldownMax:4500, duration:3800,
+      chance:0.0018, world:"frozen_tundra"
+    },
+    // === Haunted Bayou exclusive boss ===
+    {
+      key:"swamp_reaper", name:"The Swamp Reaper", emoji:"💀",
+      v:[8000,16000], w:[500,1200],
+      color:"#69f0ae", glowClass:"fish-glow-boss-swamp", cardClass:"boss-swamp",
+      trackClass:"boss-reverse-active",
+      abilityName:"SOUL DRAIN", abilityColor:"#69f0ae",
+      abilityEffect:"reverse",
+      abilityDesc:"💀 SOUL DRAIN — your control is sapped!",
+      cooldownMin:2000, cooldownMax:4000, duration:4500,
+      chance:0.0015, world:"haunted_bayou"
+    },
+    // === Volcanic Rift exclusive boss ===
+    {
+      key:"volcanic_dragon", name:"Volcanic Dragon", emoji:"🐲",
+      v:[12000,25000], w:[1200,3000],
+      color:"#ff6e40", glowClass:"fish-glow-boss-volcanic", cardClass:"boss-volcanic",
+      trackClass:"boss-surge-active",
+      abilityName:"ERUPTION", abilityColor:"#ff6e40",
+      abilityEffect:"surge",
+      abilityDesc:"🌋 ERUPTION — it's completely berserk!",
+      cooldownMin:1500, cooldownMax:3200, duration:2500,
+      chance:0.0012, world:"volcanic_rift"
+    },
+    // === Celestial Sea exclusive boss ===
+    {
+      key:"primordial_void", name:"Primordial Void", emoji:"🌌",
+      v:[20000,50000], w:[3000,8000],
+      color:"#ea80fc", glowClass:"fish-glow-boss-void", cardClass:"boss-void",
+      trackClass:"boss-reverse-active",
+      abilityName:"VOID COLLAPSE", abilityColor:"#ea80fc",
+      abilityEffect:"freeze",
+      abilityDesc:"🌌 VOID COLLAPSE — reality bends around the line!",
+      cooldownMin:1200, cooldownMax:2800, duration:5000,
+      chance:0.001, world:"celestial_sea"
+    }
+  ];
+  var BOSSES_BY_KEY = {};
+  BOSSES.forEach(function(b){ BOSSES_BY_KEY[b.key]=b; });
+
+  /* ===================== Worlds ===================== */
+  var WORLDS = [
+    {
+      key:"dockside", name:"Dockside", emoji:"🎣", cost:0,
+      desc:"The classic dock. Familiar waters, familiar faces.",
+      tagline:"a lazy afternoon of fishing",
+      headerMark:"🎣",
+      fish: null  // uses default FISH pool
+    },
+    {
+      key:"frozen_tundra", name:"Frozen Tundra", emoji:"❄️", cost:100000,
+      desc:"Glacial waters teeming with frost-touched creatures.",
+      tagline:"the ice whispers back...",
+      headerMark:"❄️",
+      fish: {
+        common:[
+          {name:"Arctic Char",     v:[5,12],  w:[0.4,1.4]},
+          {name:"Ice Smelt",       v:[4,10],  w:[0.1,0.5]},
+          {name:"Frost Perch",     v:[6,14],  w:[0.3,1.1]},
+          {name:"Snow Minnow",     v:[3,8],   w:[0.1,0.4]},
+          {name:"Polar Sculpin",   v:[5,11],  w:[0.5,1.6]}
+        ],
+        uncommon:[
+          {name:"Arctic Grayling", v:[18,34],  w:[1.2,4.5]},
+          {name:"Snowflake Trout", v:[20,38],  w:[1.5,5]},
+          {name:"Glacial Pike",    v:[22,42],  w:[2,7]},
+          {name:"Tundra Burbot",   v:[16,32],  w:[1,4]},
+          {name:"Cryofish",        v:[24,46],  w:[0.8,3]}
+        ],
+        rare:[
+          {name:"Polar Shark",        v:[80,150],  w:[8,25]},
+          {name:"Frost Titan Salmon", v:[95,175],  w:[12,35]},
+          {name:"Glacial Moray",      v:[70,140],  w:[5,18]},
+          {name:"Arctic Squid",       v:[60,120],  w:[3,12]},
+          {name:"Permafrost Eel",     v:[110,200], w:[15,45]}
+        ],
+        legendary:[
+          {name:"Aurora Serpent",     v:[380,700],   w:[30,90]},
+          {name:"Crystal Leviathan",  v:[500,900],   w:[60,180]},
+          {name:"Frost Giant Koi",    v:[320,600],   w:[10,30]},
+          {name:"Blizzard Colossus",  v:[600,1100],  w:[80,220]},
+          {name:"The Ice Wyrm",       v:[450,820],   w:[40,120]}
+        ],
+        megalodon:[
+          {name:"The Permafrost Ancient", v:[4000,8000], w:[1200,2800]}
+        ]
+      }
+    },
+    {
+      key:"haunted_bayou", name:"Haunted Bayou", emoji:"🏚️", cost:500000,
+      desc:"Murky swamp waters hiding spectral catches.",
+      tagline:"something watches from the fog...",
+      headerMark:"🏚️",
+      fish: {
+        common:[
+          {name:"Swamp Bass",      v:[8,18],  w:[0.5,1.8]},
+          {name:"Ghost Catfish",   v:[6,15],  w:[0.3,1.2]},
+          {name:"Fog Perch",       v:[7,16],  w:[0.4,1.5]},
+          {name:"Bayou Sunfish",   v:[5,13],  w:[0.2,0.9]},
+          {name:"Mudpuppy",        v:[4,11],  w:[0.1,0.6]}
+        ],
+        uncommon:[
+          {name:"Will-o-Pike",       v:[30,60],  w:[1.5,6]},
+          {name:"Specter Eel",       v:[35,70],  w:[1,5]},
+          {name:"Shadow Crappie",    v:[28,55],  w:[0.8,3]},
+          {name:"Bayou Ghost Carp",  v:[40,80],  w:[2,8]},
+          {name:"Phantom Catfish",   v:[32,65],  w:[1.5,6]}
+        ],
+        rare:[
+          {name:"Banshee Bass",       v:[140,260], w:[10,32]},
+          {name:"Voodoo Sturgeon",    v:[160,300], w:[18,55]},
+          {name:"Haunt Moray",        v:[120,240], w:[6,22]},
+          {name:"Swamp Witch Eel",    v:[180,340], w:[12,40]},
+          {name:"Phantom Leviathan",  v:[130,250], w:[8,28]}
+        ],
+        legendary:[
+          {name:"The Swamp Reaper",       v:[700,1300],  w:[50,140]},
+          {name:"Ancient Bayou Serpent",  v:[900,1700],  w:[100,280]},
+          {name:"Spectral Megacarp",      v:[600,1100],  w:[30,90]},
+          {name:"Voodoo Dragon Fish",     v:[1000,1900], w:[40,120]},
+          {name:"Lost Soul Shark",        v:[800,1500],  w:[70,200]}
+        ],
+        megalodon:[
+          {name:"The Drowned Ancient", v:[5000,10000], w:[1500,3500]}
+        ]
+      }
+    },
+    {
+      key:"volcanic_rift", name:"Volcanic Rift", emoji:"🌋", cost:2000000,
+      desc:"Magma-heated waters where only fire-blooded fish survive.",
+      tagline:"the rift burns beneath...",
+      headerMark:"🌋",
+      fish: {
+        common:[
+          {name:"Ember Dace",      v:[12,26],  w:[0.5,2]},
+          {name:"Lava Loach",      v:[10,22],  w:[0.3,1.2]},
+          {name:"Scorched Perch",  v:[14,28],  w:[0.6,2.2]},
+          {name:"Magma Minnow",    v:[8,20],   w:[0.2,0.9]},
+          {name:"Cinder Bass",     v:[15,30],  w:[0.7,2.5]}
+        ],
+        uncommon:[
+          {name:"Flame Pike",          v:[55,110],  w:[2,8]},
+          {name:"Molten Trout",        v:[60,120],  w:[2.5,9]},
+          {name:"Ashscale Catfish",    v:[50,100],  w:[3,11]},
+          {name:"Lava Carp",           v:[65,130],  w:[4,14]},
+          {name:"Eruption Sunfish",    v:[45,95],   w:[1.5,6]}
+        ],
+        rare:[
+          {name:"Inferno Shark",       v:[250,480], w:[18,55]},
+          {name:"Volcanic Sturgeon",   v:[280,540], w:[25,75]},
+          {name:"Magma Eel King",      v:[220,430], w:[10,35]},
+          {name:"Cinder Colossus",     v:[300,580], w:[30,90]},
+          {name:"Eruption Serpent",    v:[260,500], w:[15,50]}
+        ],
+        legendary:[
+          {name:"The Magma Titan",         v:[1200,2200],  w:[80,240]},
+          {name:"Volcanic Dragon",         v:[1500,2800],  w:[120,360]},
+          {name:"Primordial Flame Wyrm",   v:[1000,1900],  w:[50,160]},
+          {name:"Obsidian Leviathan",      v:[1800,3400],  w:[200,600]},
+          {name:"Phoenix Koi",             v:[900,1700],   w:[12,40]}
+        ],
+        megalodon:[
+          {name:"The Lava Ancient", v:[7000,14000], w:[2000,5000]}
+        ]
+      }
+    },
+    {
+      key:"celestial_sea", name:"Celestial Sea", emoji:"🔵", cost:10000000,
+      desc:"A cosmic ocean beyond reality. The rarest fish await.",
+      tagline:"stars swim in the deep...",
+      headerMark:"✦",
+      fish: {
+        common:[
+          {name:"Stardust Minnow",   v:[18,40],  w:[0.2,0.9]},
+          {name:"Nebula Perch",      v:[20,44],  w:[0.3,1.2]},
+          {name:"Comet Fish",        v:[16,36],  w:[0.1,0.7]},
+          {name:"Galaxy Dace",       v:[22,48],  w:[0.4,1.5]},
+          {name:"Astral Sunfish",    v:[15,34],  w:[0.2,0.8]}
+        ],
+        uncommon:[
+          {name:"Solar Trout",         v:[90,180],  w:[2,7]},
+          {name:"Lunar Bass",          v:[100,200], w:[3,10]},
+          {name:"Nebula Catfish",      v:[80,165],  w:[4,14]},
+          {name:"Pulsar Eel",          v:[110,220], w:[1.5,6]},
+          {name:"Constellation Carp",  v:[95,190],  w:[2.5,9]}
+        ],
+        rare:[
+          {name:"Black Hole Shark",   v:[500,950],   w:[30,90]},
+          {name:"Supernova Sturgeon",  v:[550,1050],  w:[40,120]},
+          {name:"Cosmic Drake",        v:[450,860],   w:[20,65]},
+          {name:"Void Leviathan",      v:[600,1150],  w:[50,160]},
+          {name:"Starfall Pike",       v:[480,920],   w:[15,50]}
+        ],
+        legendary:[
+          {name:"The Cosmic Titan",    v:[3000,5500],  w:[200,600]},
+          {name:"Galactic Serpent",    v:[3500,6500],  w:[300,900]},
+          {name:"Dark Matter Eel",     v:[2500,4800],  w:[80,260]},
+          {name:"Celestial Dragon",    v:[4000,7500],  w:[150,460]},
+          {name:"Quasar Koi",          v:[2800,5200],  w:[20,65]}
+        ],
+        megalodon:[
+          {name:"The Primordial Void", v:[15000,30000], w:[5000,12000]}
+        ]
+      }
+    }
+  ];
+  var WORLDS_BY_KEY = {};
+  WORLDS.forEach(function(w){ WORLDS_BY_KEY[w.key] = w; });
+
+  /* ===================== Depths ===================== */
+  var DEPTHS = {
+    shore: {
+      key:"shore", label:"Shore", emoji:"🏖️",
+      waitMult:0.45,
+      drainMult:0.75,
+      bossChanceMult:0,
+      weightMod:function(w){ return {common:w.common*1.6, uncommon:w.uncommon*1.1, rare:(w.rare||0)*0.3, legendary:(w.legendary||0)*0.05}; }
+    },
+    open: {
+      key:"open", label:"Open Water", emoji:"🌊",
+      waitMult:1.0,
+      drainMult:1.0,
+      bossChanceMult:1.0,
+      weightMod:null
+    },
+    abyss: {
+      key:"abyss", label:"The Abyss", emoji:"🌑",
+      waitMult:1.9,
+      drainMult:1.45,
+      bossChanceMult:5.0,
+      weightMod:function(w){ return {common:(w.common||0)*0.15, uncommon:(w.uncommon||0)*0.4, rare:(w.rare||0)*1.6, legendary:(w.legendary||0)*2.8}; }
+    }
+  };
+
+  var FISH_SVG = '<svg viewBox="0 0 100 50" xmlns="http://www.w3.org/2000/svg"><path d="M8 25 C8 12 35 6 52 14 L78 4 L70 25 L78 46 L52 36 C35 44 8 38 8 25 Z" fill="currentColor"/><circle cx="24" cy="20" r="2.6" fill="#1B1410"/></svg>';
+
+  /* ===================== Mutations ===================== */
+  var MUTATIONS = [
+    {key:"rain_blessed", name:"Rain Blessed", emoji:"🌧️", mult:2.0,
+     color:"#4fc3f7", glowColor:"rgba(79,195,247,0.9)", chance:38},
+    {key:"gilded",       name:"Gilded",       emoji:"✨",  mult:2.5,
+     color:"#ffd700", glowColor:"rgba(255,215,0,0.9)",   chance:24},
+    {key:"void_touched", name:"Void Touched", emoji:"🌑", mult:1.8,
+     color:"#ce93d8", glowColor:"rgba(206,147,216,0.9)", chance:20},
+    {key:"frost_bitten", name:"Frost Bitten", emoji:"❄️", mult:1.5,
+     color:"#80deea", glowColor:"rgba(128,222,234,0.9)", chance:15},
+    {key:"blood_moon",   name:"Blood Moon",   emoji:"🔴", mult:3.5,
+     color:"#ff7043", glowColor:"rgba(255,112,67,0.95)", chance:3}
+  ];
+  var MUTATION_CHANCE = 0.11; // 11% chance any fish is mutated
+
+  function pickMutation(){
+    var total = MUTATIONS.reduce(function(s,m){ return s+m.chance; },0);
+    var r = Math.random()*total;
+    for (var i=0;i<MUTATIONS.length;i++){
+      if (r < MUTATIONS[i].chance) return MUTATIONS[i];
+      r -= MUTATIONS[i].chance;
+    }
+    return MUTATIONS[0];
+  }
+
+  /* Rarity colour map for the reel minigame fish marker */
+  var RARITY_COLORS = {
+    common:   {color:"#9CA9A6", glowClass:"fish-glow-common"},
+    uncommon: {color:"#4FB6A8", glowClass:"fish-glow-uncommon"},
+    rare:     {color:"#C7913C", glowClass:"fish-glow-rare"},
+    legendary:{color:"#8FD14F", glowClass:"fish-glow-legendary"},
+    megalodon:{color:"#bf4fff", glowClass:"fish-glow-megalodon"}
+  };
+
+  /* Abyss fish get darker, bioluminescent colours */
+  var ABYSS_RARITY_COLORS = {
+    common:   {color:"#546e7a", glowClass:"fish-glow-abyss-common"},
+    uncommon: {color:"#1a7fa8", glowClass:"fish-glow-abyss-uncommon"},
+    rare:     {color:"#7b1fa2", glowClass:"fish-glow-abyss-rare"},
+    legendary:{color:"#c62828", glowClass:"fish-glow-abyss-legendary"},
+    megalodon:{color:"#bf4fff", glowClass:"fish-glow-megalodon"}
+  };
+
+  /* ===================== Rod / Bait SVG visuals ===================== */
+
+  function getRodSVG(idx){
+    var svgs = [
+      // 0 — Bent Twig: gnarled stick
+      '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+        +'<path d="M6 28 C22 26 54 18 130 7" stroke="#7a4f28" stroke-width="5" stroke-linecap="round" fill="none"/>'
+        +'<path d="M6 28 C22 26 54 18 130 7" stroke="#b07a50" stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray="0 9 4 9"/>'
+        +'<circle cx="32" cy="23" r="3" fill="#5a3818"/><circle cx="62" cy="17" r="2.2" fill="#5a3818"/>'
+        +'<circle cx="98" cy="11" r="1.5" fill="#5a3818"/>'
+        +'<line x1="130" y1="7" x2="138" y2="32" stroke="rgba(220,220,200,0.45)" stroke-width="0.9"/>'
+        +'<path d="M138 32 L136 36 L140 33 Z" fill="rgba(220,220,200,0.5)"/>'
+      +'</svg>',
+      // 1 — Cane Pole: bamboo segments
+      '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+        +'<path d="M4 26 L132 6" stroke="#b8a44a" stroke-width="6" stroke-linecap="round" fill="none"/>'
+        +'<path d="M4 26 L132 6" stroke="#dfc86a" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.5"/>'
+        +'<line x1="30" y1="22" x2="32" y2="22" stroke="#8a7432" stroke-width="6"/>'
+        +'<line x1="58" y1="17" x2="60" y2="16" stroke="#8a7432" stroke-width="5"/>'
+        +'<line x1="86" y1="12" x2="88" y2="11" stroke="#8a7432" stroke-width="4.5"/>'
+        +'<line x1="112" y1="8" x2="114" y2="7" stroke="#8a7432" stroke-width="3.5"/>'
+        +'<line x1="132" y1="6" x2="140" y2="30" stroke="rgba(220,220,200,0.4)" stroke-width="0.8"/>'
+      +'</svg>',
+      // 2 — Fiberglass Rod: sleek green with guide rings
+      '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+        +'<path d="M4 28 L134 5" stroke="#2d6e30" stroke-width="6" stroke-linecap="round" fill="none"/>'
+        +'<path d="M4 28 L134 5" stroke="#4CAF50" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.7"/>'
+        +'<rect x="4" y="22" width="20" height="9" rx="4" fill="#1a3a1c"/>'
+        +'<circle cx="50" cy="19" r="4" stroke="#4CAF50" stroke-width="1.8" fill="none"/>'
+        +'<circle cx="50" cy="19" r="1.2" fill="#4CAF50" opacity="0.6"/>'
+        +'<circle cx="78" cy="14" r="3.2" stroke="#4CAF50" stroke-width="1.5" fill="none"/>'
+        +'<circle cx="78" cy="14" r="1" fill="#4CAF50" opacity="0.6"/>'
+        +'<circle cx="104" cy="9.5" r="2.4" stroke="#4CAF50" stroke-width="1.2" fill="none"/>'
+        +'<line x1="134" y1="5" x2="140" y2="30" stroke="rgba(200,240,200,0.45)" stroke-width="0.8"/>'
+      +'</svg>',
+      // 3 — Graphite Pro: dark slate, blue accents, cork grip
+      '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+        +'<path d="M4 28 L134 4" stroke="#2a3040" stroke-width="7" stroke-linecap="round" fill="none"/>'
+        +'<path d="M4 28 L134 4" stroke="#42A5F5" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.8"/>'
+        +'<rect x="4" y="20" width="22" height="11" rx="5" fill="#3e2a18"/>'
+        +'<path d="M4 25 C6 23 10 27 12 25 C14 23 18 27 20 25 C22 23 24 27 26 25" stroke="#c09060" stroke-width="1.2" fill="none"/>'
+        +'<circle cx="52" cy="18" r="4" stroke="#42A5F5" stroke-width="2" fill="none"/>'
+        +'<circle cx="78" cy="13" r="3.2" stroke="#42A5F5" stroke-width="1.8" fill="none"/>'
+        +'<circle cx="104" cy="9" r="2.5" stroke="#42A5F5" stroke-width="1.5" fill="none"/>'
+        +'<circle cx="122" cy="6.5" r="1.8" stroke="#42A5F5" stroke-width="1.2" fill="none"/>'
+        +'<line x1="134" y1="4" x2="140" y2="30" stroke="rgba(180,220,255,0.5)" stroke-width="0.9"/>'
+      +'</svg>',
+      // 4 — Deep Sea Titan: thick purple, heavy butt
+      '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+        +'<path d="M4 30 C20 28 60 20 134 4" stroke="#1a0a2e" stroke-width="9" stroke-linecap="round" fill="none"/>'
+        +'<path d="M4 30 C20 28 60 20 134 4" stroke="#7b1fa2" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.85"/>'
+        +'<rect x="4" y="22" width="28" height="13" rx="6" fill="#12082a"/>'
+        +'<rect x="4" y="24" width="28" height="3" rx="1.5" fill="#7b1fa2" opacity="0.6"/>'
+        +'<circle cx="52" cy="22" r="5" stroke="#ab47bc" stroke-width="2.2" fill="none"/>'
+        +'<circle cx="82" cy="15" r="4" stroke="#ab47bc" stroke-width="2" fill="none"/>'
+        +'<circle cx="110" cy="9" r="3" stroke="#ab47bc" stroke-width="1.8" fill="none"/>'
+        +'<line x1="134" y1="4" x2="140" y2="32" stroke="rgba(200,150,255,0.5)" stroke-width="1.1"/>'
+      +'</svg>',
+      // 5 — Golden Angler: ornate gold with thread wrapping
+      '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+        +'<defs><linearGradient id="gRod" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#9a6b1a"/><stop offset="50%" stop-color="#E2B563"/><stop offset="100%" stop-color="#ffd700"/></linearGradient></defs>'
+        +'<path d="M4 28 L134 4" stroke="url(#gRod)" stroke-width="7" stroke-linecap="round" fill="none"/>'
+        +'<path d="M4 28 L134 4" stroke="#fff8e1" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.35"/>'
+        +'<rect x="4" y="20" width="26" height="12" rx="5" fill="#7a5015"/>'
+        +'<path d="M6 24 L30 24 M6 26 L30 26 M6 28 L30 28 M8 30 L28 30" stroke="#E2B563" stroke-width="0.9" opacity="0.5"/>'
+        +'<circle cx="50" cy="19" r="4.5" stroke="#ffd700" stroke-width="2" fill="none"/>'
+        +'<circle cx="50" cy="19" r="1.5" fill="#ffd700" opacity="0.8"/>'
+        +'<circle cx="78" cy="13.5" r="3.5" stroke="#ffd700" stroke-width="1.8" fill="none"/>'
+        +'<circle cx="104" cy="8.5" r="2.5" stroke="#ffd700" stroke-width="1.5" fill="none"/>'
+        +'<circle cx="122" cy="6" r="1.8" stroke="#ffd700" stroke-width="1.2" fill="none"/>'
+        +'<line x1="134" y1="4" x2="140" y2="30" stroke="rgba(255,230,100,0.6)" stroke-width="1"/>'
+        +'<path d="M140 30 L137 34 L142 31 Z" fill="rgba(255,215,0,0.7)"/>'
+      +'</svg>',
+      // 6 — Frost Spine: ice crystal rod, wide, pale blue
+      '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+        +'<defs><linearGradient id="frostG" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#006064"/><stop offset="50%" stop-color="#80deea"/><stop offset="100%" stop-color="#e0f7fa"/></linearGradient></defs>'
+        +'<path d="M4 28 L134 4" stroke="url(#frostG)" stroke-width="7" stroke-linecap="round" fill="none"/>'
+        +'<path d="M4 28 L134 4" stroke="#e0f7fa" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.5"/>'
+        +'<rect x="4" y="20" width="26" height="12" rx="5" fill="#004d56"/>'
+        +'<!-- Ice crystals along rod -->'
+        +'<polygon points="36,16 38,9 40,16" fill="#b2ebf2" opacity="0.9"/>'
+        +'<polygon points="36,18 40,18 38,14" fill="#e0f7fa" opacity="0.6"/>'
+        +'<polygon points="62,11 64,5 66,11" fill="#b2ebf2" opacity="0.85"/>'
+        +'<polygon points="62,13 66,13 64,9" fill="#e0f7fa" opacity="0.5"/>'
+        +'<polygon points="88,7 90,1 92,7" fill="#b2ebf2" opacity="0.8"/>'
+        +'<polygon points="112,4 114,0 116,4" fill="#e0f7fa" opacity="0.7"/>'
+        +'<circle cx="36" cy="17" r="1.2" fill="#fff" opacity="0.7"/>'
+        +'<circle cx="62" cy="12" r="1" fill="#fff" opacity="0.6"/>'
+        +'<line x1="134" y1="4" x2="140" y2="30" stroke="rgba(180,240,255,0.5)" stroke-width="0.9"/>'
+      +'</svg>',
+      // 7 — Magma Core: volcanic cracked rod glowing orange
+      '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+        +'<defs><linearGradient id="magmaG" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1a0500"/><stop offset="40%" stop-color="#bf360c"/><stop offset="100%" stop-color="#ff5722"/></linearGradient></defs>'
+        +'<path d="M4 28 L134 4" stroke="url(#magmaG)" stroke-width="9" stroke-linecap="round" fill="none"/>'
+        +'<!-- Lava cracks -->'
+        +'<path d="M25 23 L28 17 L32 21 L35 15" stroke="#ff9800" stroke-width="1.5" fill="none" stroke-linecap="round"/>'
+        +'<path d="M55 16 L58 10 L62 14 L65 8" stroke="#ff9800" stroke-width="1.3" fill="none" stroke-linecap="round"/>'
+        +'<path d="M85 10 L88 5 L92 8 L95 3" stroke="#ffcc02" stroke-width="1.1" fill="none" stroke-linecap="round"/>'
+        +'<circle cx="28" cy="19" r="2" fill="#ffcc02" opacity="0.6"/>'
+        +'<circle cx="62" cy="12" r="1.5" fill="#ffcc02" opacity="0.55"/>'
+        +'<circle cx="90" cy="6" r="1.2" fill="#ffcc02" opacity="0.5"/>'
+        +'<rect x="4" y="20" width="28" height="13" rx="6" fill="#0d0200"/>'
+        +'<path d="M6 26 L32 26" stroke="#ff5722" stroke-width="1.5" opacity="0.7"/>'
+        +'<line x1="134" y1="4" x2="140" y2="30" stroke="rgba(255,120,50,0.6)" stroke-width="1.1"/>'
+      +'</svg>',
+      // 8 — Seraph's Staff: golden divine rod with wing motifs
+      '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+        +'<defs>'
+          +'<linearGradient id="seraphG" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#b8860b"/><stop offset="50%" stop-color="#fff176"/><stop offset="100%" stop-color="#fffde7"/></linearGradient>'
+          +'<filter id="seraphGlow"><feGaussianBlur stdDeviation="1.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+        +'</defs>'
+        +'<path d="M4 28 L134 4" stroke="url(#seraphG)" stroke-width="7" stroke-linecap="round" fill="none" filter="url(#seraphGlow)"/>'
+        +'<path d="M4 28 L134 4" stroke="#fffde7" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.45"/>'
+        +'<!-- Wing motif at grip -->'
+        +'<rect x="4" y="21" width="24" height="11" rx="5" fill="#7a5015"/>'
+        +'<path d="M28 22 C36 16 40 12 36 8" stroke="#fff176" stroke-width="1.8" fill="none" stroke-linecap="round" opacity="0.8"/>'
+        +'<path d="M28 24 C36 20 42 20 40 14" stroke="#fff176" stroke-width="1.4" fill="none" stroke-linecap="round" opacity="0.6"/>'
+        +'<!-- Halo ring near tip -->'
+        +'<ellipse cx="118" cy="6" rx="10" ry="4" stroke="#fff176" stroke-width="1.5" fill="none" opacity="0.7" filter="url(#seraphGlow)"/>'
+        +'<!-- Guide rings -->'
+        +'<circle cx="56" cy="17" r="4" stroke="#fff176" stroke-width="1.8" fill="none" opacity="0.9"/>'
+        +'<circle cx="84" cy="11" r="3" stroke="#fff176" stroke-width="1.5" fill="none" opacity="0.85"/>'
+        +'<circle cx="104" cy="8" r="2.2" stroke="#fff176" stroke-width="1.3" fill="none" opacity="0.8"/>'
+        +'<line x1="134" y1="4" x2="140" y2="30" stroke="rgba(255,241,118,0.7)" stroke-width="1"/>'
+      +'</svg>'
+    ];
+    return svgs[idx] || (function(){
+      // World rod fallback SVGs based on the rod's world
+      var rod = RODS[idx];
+      if (!rod) return svgs[0];
+      var wkey = rod.world;
+      if (wkey === "frozen_tundra"){
+        return '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+          +'<defs><linearGradient id="ftG'+idx+'" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#006064"/><stop offset="50%" stop-color="#4fc3f7"/><stop offset="100%" stop-color="#e0f7fa"/></linearGradient></defs>'
+          +'<path d="M4 28 L134 4" stroke="url(#ftG'+idx+')" stroke-width="'+(6+Math.floor(idx/3))+'" stroke-linecap="round" fill="none"/>'
+          +'<rect x="4" y="21" width="24" height="11" rx="5" fill="#004d56"/>'
+          +'<polygon points="50,14 52,7 54,14" fill="#b2ebf2" opacity="0.9"/>'
+          +'<polygon points="76,10 78,3 80,10" fill="#e0f7fa" opacity="0.8"/>'
+          +'<polygon points="102,6 104,0 106,6" fill="#b2ebf2" opacity="0.7"/>'
+          +'<line x1="134" y1="4" x2="140" y2="30" stroke="rgba(180,240,255,0.55)" stroke-width="0.9"/>'
+        +'</svg>';
+      }
+      if (wkey === "haunted_bayou"){
+        return '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+          +'<defs><linearGradient id="hbG'+idx+'" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1b5e20"/><stop offset="55%" stop-color="#4caf50"/><stop offset="100%" stop-color="#c8e6c9"/></linearGradient></defs>'
+          +'<path d="M4 28 C20 24 60 18 134 4" stroke="url(#hbG'+idx+')" stroke-width="'+(6+Math.floor(idx/3))+'" stroke-linecap="round" fill="none"/>'
+          +'<rect x="4" y="21" width="24" height="11" rx="5" fill="#0a2e0c"/>'
+          +'<path d="M38 20 C40 14 44 16 42 10" stroke="#a5d6a7" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.8"/>'
+          +'<path d="M68 14 C70 8 74 10 72 4" stroke="#c8e6c9" stroke-width="1.3" fill="none" stroke-linecap="round" opacity="0.7"/>'
+          +'<circle cx="40" cy="10" r="2" fill="#69f0ae" opacity="0.6"/>'
+          +'<circle cx="70" cy="4" r="1.5" fill="#69f0ae" opacity="0.5"/>'
+          +'<line x1="134" y1="4" x2="140" y2="30" stroke="rgba(165,214,167,0.5)" stroke-width="0.9"/>'
+        +'</svg>';
+      }
+      if (wkey === "volcanic_rift"){
+        return '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+          +'<defs><linearGradient id="vrG'+idx+'" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#3e0a00"/><stop offset="45%" stop-color="#ff5722"/><stop offset="100%" stop-color="#ff9800"/></linearGradient></defs>'
+          +'<path d="M4 28 L134 4" stroke="url(#vrG'+idx+')" stroke-width="'+(7+Math.floor(idx/3))+'" stroke-linecap="round" fill="none"/>'
+          +'<rect x="4" y="21" width="26" height="12" rx="6" fill="#0d0200"/>'
+          +'<path d="M32 22 L35 14 L38 19 L41 11" stroke="#ff9800" stroke-width="2" fill="none" stroke-linecap="round"/>'
+          +'<path d="M65 15 L68 8 L71 13 L74 6" stroke="#ffcc02" stroke-width="1.8" fill="none" stroke-linecap="round"/>'
+          +'<path d="M98 9 L101 3 L104 7 L107 1" stroke="#ff9800" stroke-width="1.5" fill="none" stroke-linecap="round"/>'
+          +'<line x1="134" y1="4" x2="140" y2="30" stroke="rgba(255,150,60,0.6)" stroke-width="1.2"/>'
+        +'</svg>';
+      }
+      if (wkey === "celestial_sea"){
+        return '<svg viewBox="0 0 140 36" xmlns="http://www.w3.org/2000/svg">'
+          +'<defs>'
+            +'<linearGradient id="csG'+idx+'" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1a004a"/><stop offset="50%" stop-color="#9c27b0"/><stop offset="100%" stop-color="#ea80fc"/></linearGradient>'
+            +'<filter id="csGlow'+idx+'"><feGaussianBlur stdDeviation="1.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+          +'</defs>'
+          +'<path d="M4 28 L134 4" stroke="url(#csG'+idx+')" stroke-width="'+(7+Math.floor(idx/3))+'" stroke-linecap="round" fill="none" filter="url(#csGlow'+idx+')"/>'
+          +'<rect x="4" y="21" width="24" height="11" rx="5" fill="#0e0030"/>'
+          +'<circle cx="44" cy="17" r="2.5" fill="#ea80fc" opacity="0.85"/>'
+          +'<circle cx="70" cy="12" r="2" fill="#e1bee7" opacity="0.8"/>'
+          +'<circle cx="96" cy="8" r="1.5" fill="#ea80fc" opacity="0.75"/>'
+          +'<circle cx="116" cy="5" r="1.2" fill="#e1bee7" opacity="0.7"/>'
+          +'<line x1="134" y1="4" x2="140" y2="30" stroke="rgba(234,128,252,0.65)" stroke-width="1.1"/>'
+          +'<path d="M140 30 L137 34 L142 31 Z" fill="rgba(234,128,252,0.7)"/>'
+        +'</svg>';
+      }
+      return svgs[0];
+    })();
+  }
+
+  function getBaitSVG(key){
+    var map = {
+      worms:
+        '<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">'
+          +'<ellipse cx="22" cy="34" rx="16" ry="6" fill="#5a3a1a" opacity="0.9"/>'
+          +'<path d="M14 30 C12 22 16 18 14 10 C12 6 18 4 20 10 C22 18 18 22 20 30" stroke="#d4826e" stroke-width="3.5" fill="none" stroke-linecap="round"/>'
+          +'<path d="M24 32 C22 24 28 20 26 12 C25 8 30 7 31 12 C33 20 27 25 29 32" stroke="#e8a090" stroke-width="3" fill="none" stroke-linecap="round"/>'
+          +'<circle cx="14" cy="10" r="2.5" fill="#ff8a80"/>'
+          +'<circle cx="31" cy="12" r="2" fill="#ff8a80"/>'
+        +'</svg>',
+      cricket:
+        '<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">'
+          +'<ellipse cx="22" cy="26" rx="10" ry="7" fill="#4a7c2f"/>'
+          +'<ellipse cx="22" cy="18" rx="7" ry="6" fill="#5a9238"/>'
+          +'<circle cx="22" cy="14" r="4.5" fill="#6aad40"/>'
+          +'<circle cx="20" cy="13" r="1.2" fill="#1a2a0a"/>'
+          +'<circle cx="24" cy="13" r="1.2" fill="#1a2a0a"/>'
+          +'<line x1="12" y1="20" x2="4" y2="14" stroke="#3d6825" stroke-width="1.5" stroke-linecap="round"/>'
+          +'<line x1="12" y1="24" x2="3" y2="22" stroke="#3d6825" stroke-width="1.5" stroke-linecap="round"/>'
+          +'<line x1="12" y1="28" x2="4" y2="32" stroke="#3d6825" stroke-width="1.5" stroke-linecap="round"/>'
+          +'<line x1="32" y1="20" x2="40" y2="14" stroke="#3d6825" stroke-width="1.5" stroke-linecap="round"/>'
+          +'<line x1="32" y1="24" x2="41" y2="22" stroke="#3d6825" stroke-width="1.5" stroke-linecap="round"/>'
+          +'<line x1="32" y1="28" x2="40" y2="32" stroke="#3d6825" stroke-width="1.5" stroke-linecap="round"/>'
+          +'<path d="M18 12 C20 6 24 6 26 12" stroke="#3d6825" stroke-width="1.5" fill="none" stroke-linecap="round"/>'
+        +'</svg>',
+      minnow:
+        '<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">'
+          +'<defs><linearGradient id="minnG" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#c8d8e8"/><stop offset="100%" stop-color="#90aec0"/></linearGradient></defs>'
+          +'<path d="M8 22 C8 14 22 10 32 16 L42 10 L38 22 L42 34 L32 28 C22 34 8 30 8 22 Z" fill="url(#minnG)"/>'
+          +'<path d="M8 22 C8 17 22 13 32 18" stroke="#b0c8dc" stroke-width="1" fill="none" opacity="0.7"/>'
+          +'<circle cx="16" cy="19" r="2" fill="#2a3a4a" opacity="0.9"/>'
+          +'<circle cx="16" cy="19" r="0.7" fill="#fff" opacity="0.6"/>'
+          +'<path d="M22 16 L20 22 L24 22 Z" fill="rgba(180,210,230,0.6)"/>'
+        +'</svg>',
+      goldenroe:
+        '<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">'
+          +'<circle cx="18" cy="22" r="7" fill="#e8940a" opacity="0.95"/>'
+          +'<circle cx="28" cy="20" r="6.5" fill="#f0a820" opacity="0.95"/>'
+          +'<circle cx="22" cy="30" r="6" fill="#d4800a" opacity="0.9"/>'
+          +'<circle cx="14" cy="28" r="5" fill="#f0a820" opacity="0.85"/>'
+          +'<circle cx="30" cy="30" r="5.5" fill="#e8940a" opacity="0.85"/>'
+          +'<circle cx="18" cy="20" r="2.5" fill="rgba(255,235,150,0.5)"/>'
+          +'<circle cx="28" cy="18" r="2" fill="rgba(255,235,150,0.5)"/>'
+          +'<circle cx="22" cy="28" r="1.8" fill="rgba(255,235,150,0.4)"/>'
+          +'<ellipse cx="22" cy="36" rx="12" ry="4" fill="rgba(0,0,0,0.2)"/>'
+        +'</svg>',
+      deepchum:
+        '<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">'
+          +'<defs><radialGradient id="chumG" cx="40%" cy="40%"><stop offset="0%" stop-color="#8b1a1a"/><stop offset="100%" stop-color="#3a0808"/></radialGradient></defs>'
+          +'<path d="M10 28 C8 18 14 10 22 10 C30 10 38 16 36 26 C34 36 12 40 10 28 Z" fill="url(#chumG)"/>'
+          +'<circle cx="16" cy="20" r="2" fill="#c02020" opacity="0.7"/>'
+          +'<circle cx="26" cy="17" r="1.5" fill="#c02020" opacity="0.7"/>'
+          +'<circle cx="30" cy="26" r="2.5" fill="#c02020" opacity="0.6"/>'
+          +'<circle cx="18" cy="30" r="1.8" fill="#c02020" opacity="0.6"/>'
+          +'<path d="M14 14 C16 8 20 6 22 10" stroke="#8b1a1a" stroke-width="1.5" fill="none" opacity="0.6"/>'
+          +'<path d="M30 12 C33 8 36 10 34 16" stroke="#8b1a1a" stroke-width="1.5" fill="none" opacity="0.6"/>'
+        +'</svg>',
+      glowlure:
+        '<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">'
+          +'<defs>'
+            +'<radialGradient id="lureG" cx="35%" cy="30%"><stop offset="0%" stop-color="#a0ffd8"/><stop offset="60%" stop-color="#00bfa5"/><stop offset="100%" stop-color="#005746"/></radialGradient>'
+            +'<filter id="lureGlow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+          +'</defs>'
+          +'<ellipse cx="22" cy="16" rx="6" ry="11" fill="url(#lureG)" filter="url(#lureGlow)"/>'
+          +'<path d="M16 22 C10 30 12 38 22 38 C32 38 34 30 28 22" fill="url(#lureG)" opacity="0.85" filter="url(#lureGlow)"/>'
+          +'<line x1="22" y1="5" x2="22" y2="2" stroke="#00bfa5" stroke-width="1.5" stroke-linecap="round"/>'
+          +'<circle cx="22" cy="2" r="1.5" fill="#a0ffd8" opacity="0.8"/>'
+          +'<line x1="14" y1="32" x2="10" y2="38" stroke="#00bfa5" stroke-width="1.5" stroke-linecap="round"/>'
+          +'<line x1="30" y1="32" x2="34" y2="38" stroke="#00bfa5" stroke-width="1.5" stroke-linecap="round"/>'
+          +'<circle cx="22" cy="14" r="4" fill="rgba(160,255,216,0.35)"/>'
+          +'<circle cx="22" cy="22" rx="4" ry="8" fill="rgba(160,255,216,0.15)"/>'
+        +'</svg>',
+      glacier_roe:
+        '<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">'
+          +'<defs><radialGradient id="grG" cx="40%" cy="40%"><stop offset="0%" stop-color="#e0f7fa"/><stop offset="60%" stop-color="#4fc3f7"/><stop offset="100%" stop-color="#01579b"/></radialGradient></defs>'
+          +'<circle cx="18" cy="22" r="7" fill="url(#grG)" opacity="0.95"/>'
+          +'<circle cx="28" cy="20" r="6.5" fill="url(#grG)" opacity="0.9"/>'
+          +'<circle cx="22" cy="30" r="6" fill="url(#grG)" opacity="0.85"/>'
+          +'<circle cx="18" cy="20" r="2.5" fill="rgba(255,255,255,0.5)"/>'
+          +'<circle cx="28" cy="18" r="2" fill="rgba(255,255,255,0.5)"/>'
+          +'<polygon points="14,14 16,8 18,14" fill="#b2ebf2" opacity="0.8"/>'
+          +'<polygon points="28,12 30,6 32,12" fill="#e0f7fa" opacity="0.7"/>'
+          +'<ellipse cx="22" cy="36" rx="12" ry="4" fill="rgba(0,0,0,0.2)"/>'
+        +'</svg>',
+      spirit_moth:
+        '<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">'
+          +'<defs><radialGradient id="smG" cx="50%" cy="30%"><stop offset="0%" stop-color="#f1f8e9"/><stop offset="70%" stop-color="#a5d6a7"/><stop offset="100%" stop-color="#2e7d32"/></radialGradient></defs>'
+          +'<!-- Wings -->'
+          +'<ellipse cx="13" cy="20" rx="10" ry="7" fill="url(#smG)" opacity="0.8" transform="rotate(-20 13 20)"/>'
+          +'<ellipse cx="31" cy="20" rx="10" ry="7" fill="url(#smG)" opacity="0.8" transform="rotate(20 31 20)"/>'
+          +'<ellipse cx="14" cy="28" rx="7" ry="5" fill="url(#smG)" opacity="0.6" transform="rotate(-30 14 28)"/>'
+          +'<ellipse cx="30" cy="28" rx="7" ry="5" fill="url(#smG)" opacity="0.6" transform="rotate(30 30 28)"/>'
+          +'<!-- Body -->'
+          +'<ellipse cx="22" cy="22" rx="3" ry="9" fill="#1b5e20"/>'
+          +'<circle cx="22" cy="13" r="3" fill="#2e7d32"/>'
+          +'<circle cx="21" cy="12" r="1" fill="#69f0ae" opacity="0.8"/>'
+          +'<circle cx="23" cy="12" r="1" fill="#69f0ae" opacity="0.8"/>'
+        +'</svg>',
+      magma_grub:
+        '<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">'
+          +'<defs><linearGradient id="mgG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ff8a65"/><stop offset="100%" stop-color="#bf360c"/></linearGradient></defs>'
+          +'<ellipse cx="22" cy="34" rx="14" ry="5" fill="#3e0a00" opacity="0.8"/>'
+          +'<ellipse cx="22" cy="20" rx="10" ry="14" fill="url(#mgG)"/>'
+          +'<circle cx="18" cy="12" r="4" fill="#ff7043"/>'
+          +'<circle cx="26" cy="12" r="4" fill="#ff7043"/>'
+          +'<circle cx="22" cy="9" r="4.5" fill="#ff5722"/>'
+          +'<circle cx="20" cy="8" r="1.2" fill="#1a0000"/>'
+          +'<circle cx="24" cy="8" r="1.2" fill="#1a0000"/>'
+          +'<path d="M16 20 C14 16 16 14 18 18" stroke="#ff9800" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+          +'<path d="M28 20 C30 16 28 14 26 18" stroke="#ff9800" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+          +'<circle cx="22" cy="22" r="3" fill="#ffcc02" opacity="0.5"/>'
+        +'</svg>',
+      void_crystal:
+        '<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">'
+          +'<defs>'
+            +'<radialGradient id="vcG" cx="35%" cy="25%"><stop offset="0%" stop-color="#ea80fc"/><stop offset="60%" stop-color="#9c27b0"/><stop offset="100%" stop-color="#1a004a"/></radialGradient>'
+            +'<filter id="vcGlow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+          +'</defs>'
+          +'<polygon points="22,4 28,14 38,14 30,22 33,33 22,27 11,33 14,22 6,14 16,14" fill="url(#vcG)" filter="url(#vcGlow)" opacity="0.95"/>'
+          +'<polygon points="22,10 26,16 32,16 27,21 29,28 22,24 15,28 17,21 12,16 18,16" fill="#ea80fc" opacity="0.3"/>'
+          +'<circle cx="22" cy="18" r="3" fill="rgba(255,255,255,0.5)"/>'
+        +'</svg>'
+    };
+    return map[key] || '';
+  }
+
+  /* ===================== State ===================== */
+
+  var STATE = {IDLE:"idle",CASTING:"casting",WAITING:"waiting",BITING:"biting",REELING:"reeling"};
+  var phase = STATE.IDLE;
+  var pendingFish = null; // {name, rarity, value, weight} or {isAccessory, accKey}
+  var timers = {};
+  var hookRAF = null;
+  var reel = null;
+  var rippleInterval = null;
+
+  function defaultState(){
+    return {
+      coins:20,
+      rodIndex:0,
+      unlockedRods:[0],
+      currentBait:"worms",
+      castDepth:"open",
+      currentWorld:"dockside",
+      unlockedWorlds:["dockside"],
+      baitInventory:{cricket:0,minnow:0,goldenroe:0,deepchum:0,glowlure:0,glacier_roe:0,spirit_moth:0,magma_grub:0,void_crystal:0},
+      inventory:[],
+      accessories:[], // owned acc keys (can have duplicates)
+      equippedAcc:[], // up to 3 acc keys
+      stats:{totalCaught:0, biggestValue:0, accessoriesFound:0}
+    };
+  }
+  var game = defaultState();
+
+  /* ===================== DOM refs ===================== */
+
+  var coinAmountEl    = document.getElementById("coinAmount");
+  var rodLabelEl      = document.getElementById("rodLabel");
+  var baitLabelEl     = document.getElementById("baitLabel");
+  var statusTextEl    = document.getElementById("statusText");
+  var bobberEl        = document.getElementById("bobber");
+  var ripplesEl       = document.getElementById("ripples");
+  var alertBadgeEl    = document.getElementById("alertBadge");
+  var activeGearEl    = document.getElementById("activeGear");
+
+  var castWrap        = document.getElementById("castWrap");
+  var hookWrap        = document.getElementById("hookWrap");
+  var reelWrap        = document.getElementById("reelWrap");
+  var castBtn         = document.getElementById("castBtn");
+  var hookBtn         = document.getElementById("hookBtn");
+  var hookTimerFill   = document.getElementById("hookTimerFill");
+  var reelBtn         = document.getElementById("reelBtn");
+  var catchZoneEl     = document.getElementById("catchZone");
+  var fishMarkerEl    = document.getElementById("fishMarker");
+  var progressFillEl  = document.getElementById("progressFill");
+  var reelTrackEl     = document.getElementById("reelTrack");
+  var bossAbilityBar  = document.getElementById("bossAbilityBar");
+  var bossAbilityFill = document.getElementById("bossAbilityFill");
+
+  var tabBtns         = Array.prototype.slice.call(document.querySelectorAll(".tab-btn"));
+  var coolerPanel     = document.getElementById("coolerPanel");
+  var shopPanel       = document.getElementById("shopPanel");
+  var accessoriesPanel= document.getElementById("accessoriesPanel");
+  var fishListEl      = document.getElementById("fishList");
+  var fishCountEl     = document.getElementById("fishCount");
+  var sellAllBtn      = document.getElementById("sellAllBtn");
+  var rodListEl       = document.getElementById("rodList");
+  var baitListEl      = document.getElementById("baitList");
+  var baitChipsEl     = document.getElementById("baitChips");
+  var lifetimeStatsEl = document.getElementById("lifetimeStats");
+  var resetBtn        = document.getElementById("resetBtn");
+  var toastStack      = document.getElementById("toastStack");
+  var accSlotsEl      = document.getElementById("accSlots");
+  var accInvEl        = document.getElementById("accInv");
+  var worldsPanel     = document.getElementById("worldsPanel");
+  var worldListEl     = document.getElementById("worldList");
+
+  var prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+  /* ===================== Helpers ===================== */
+
+  function clamp(v,min,max){ return Math.max(min,Math.min(max,v)); }
+  function randRange(min,max){ return min + Math.random()*(max-min); }
+  function makeId(){ return "f"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+  /* ===================== Accessory helpers ===================== */
+
+  function getEquippedEffects(){
+    // Returns merged effect map from all equipped accessories
+    var fx = {sellBonus:1, rarityUp:0, hookWindow:1, megalodonChance:1, pullSpeed:1, waitReduction:1, zoneBonus:0, fillBonus:0, baitBonus:0};
+    game.equippedAcc.forEach(function(key){
+      var a = ACC_BY_KEY[key];
+      if (!a) return;
+      if (a.effect === "sellBonus")        fx.sellBonus       *= a.value;
+      if (a.effect === "rarityUp")         fx.rarityUp        += a.value;
+      if (a.effect === "hookWindow")       fx.hookWindow      *= a.value;
+      if (a.effect === "megalodonChance")  fx.megalodonChance *= a.value;
+      if (a.effect === "pullSpeed")        fx.pullSpeed       *= a.value;
+      if (a.effect === "waitReduction")    fx.waitReduction   *= a.value;
+      if (a.effect === "zoneBonus")        fx.zoneBonus       += a.value;
+      if (a.effect === "fillBonus")        fx.fillBonus       += a.value;
+      if (a.effect === "baitBonus")        fx.baitBonus       += a.value;
+    });
+    return fx;
+  }
+
+  function pickAccessoryDrop(){
+    var total = ACC_DROP_POOL.reduce(function(s,e){ return s+e.w; },0);
+    var r = Math.random()*total;
+    for (var i=0;i<ACC_DROP_POOL.length;i++){
+      if (r < ACC_DROP_POOL[i].w) return ACC_DROP_POOL[i].key;
+      r -= ACC_DROP_POOL[i].w;
+    }
+    return ACC_DROP_POOL[0].key;
+  }
+
+  function equipAcc(key){
+    if (game.equippedAcc.length >= 3){ showToast("All 3 slots are full — unequip one first.", "warn"); return; }
+    game.equippedAcc.push(key);
+    var a = ACC_BY_KEY[key];
+    showToast(a.icon + " Equipped " + a.name + "!", "acc");
+    renderAccessories(); renderHeader(); renderRig(); renderShop(); saveGame();
+  }
+
+  function unequipAcc(idx){
+    game.equippedAcc.splice(idx,1);
+    renderAccessories(); renderHeader(); renderRig(); renderShop(); saveGame();
+  }
+
+  /* ===================== Rarity picker ===================== */
+
+  function pickRarity(weights){
+    var fx = getEquippedEffects();
+    // Megalodon base chance 0.3%, multiplied by accessory
+    if (Math.random() < 0.003 * fx.megalodonChance) return "megalodon";
+    // rarityUp shifts common weight down and legendary up
+    var w = {
+      common:   Math.max(0, weights.common   - fx.rarityUp * 100),
+      uncommon: weights.uncommon,
+      rare:     weights.rare    + fx.rarityUp * 50,
+      legendary:weights.legendary + fx.rarityUp * 50
+    };
+    var entries = Object.keys(w).map(function(k){ return [k, w[k]]; });
+    var total = entries.reduce(function(s,e){ return s+e[1]; },0);
+    var r = Math.random()*total;
+    for (var i=0;i<entries.length;i++){
+      if (r < entries[i][1]) return entries[i][0];
+      r -= entries[i][1];
+    }
+    return entries[entries.length-1][0];
+  }
+
+  function showToast(msg,type){
+    var t = document.createElement("div");
+    t.className = "toast "+(type||"good");
+    t.textContent = msg;
+    toastStack.appendChild(t);
+    setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); },2900);
+  }
+
+  /* ===================== Persistence ===================== */
+
+  var SAVE_KEY = "dockside-save-v3";
+  // All previous save keys to migrate from (newest first so best data wins)
+  var LEGACY_KEYS = ["dockside-save-v2", "dockside-save-v1", "dockside-save"];
+
+  function saveGame(){
+    var data = JSON.stringify(game);
+    try{ localStorage.setItem(SAVE_KEY, data); }catch(e){}
+    if (window.storage){
+      window.storage.set(SAVE_KEY, data, false).catch(function(){});
+    }
+  }
+
+  // Safe wrapper — storage.get THROWS on missing key instead of returning null
+  function storageSafeGet(key){
+    if (!window.storage) return Promise.resolve(null);
+    return window.storage.get(key, false)
+      .then(function(res){ return (res && res.value) ? res.value : null; })
+      .catch(function(){ return null; });
+  }
+
+  function loadGame(){
+    function applyState(saved){
+      if (!saved) return;
+      var def = defaultState();
+      game = Object.assign(def, saved);
+      game.baitInventory = Object.assign({cricket:0,minnow:0,goldenroe:0,deepchum:0,glowlure:0,glacier_roe:0,spirit_moth:0,magma_grub:0,void_crystal:0}, saved.baitInventory||{});
+      game.stats = Object.assign(def.stats, saved.stats||{});
+      game.inventory = Array.isArray(saved.inventory)?saved.inventory:[];
+      game.accessories = Array.isArray(saved.accessories)?saved.accessories:[];
+      game.equippedAcc = Array.isArray(saved.equippedAcc)?saved.equippedAcc:[];
+      game.unlockedRods = (Array.isArray(saved.unlockedRods)&&saved.unlockedRods.length)?saved.unlockedRods:[0];
+      game.rodIndex = (typeof saved.rodIndex==="number")?saved.rodIndex:0;
+      game.currentBait = saved.currentBait||"worms";
+      game.currentWorld = saved.currentWorld||"dockside";
+      game.unlockedWorlds = (Array.isArray(saved.unlockedWorlds)&&saved.unlockedWorlds.length)?saved.unlockedWorlds:["dockside"];
+    }
+
+    // All keys to check, current first then legacy
+    var allKeys = [SAVE_KEY].concat(LEGACY_KEYS);
+
+    // 1. Check localStorage for any key (fast, synchronous)
+    for (var i=0; i<allKeys.length; i++){
+      try{
+        var raw = localStorage.getItem(allKeys[i]);
+        if (raw){
+          var parsed = JSON.parse(raw);
+          applyState(parsed);
+          if (allKeys[i] !== SAVE_KEY){
+            // Migrate to current key
+            try{ localStorage.setItem(SAVE_KEY, raw); }catch(e){}
+            setTimeout(function(){ showToast("✅ Progress carried over from your old save!","good"); },600);
+          }
+          return Promise.resolve();
+        }
+      }catch(e){}
+    }
+
+    // 2. Nothing in localStorage — try artifact storage (claude.ai), key by key
+    var chain = Promise.resolve(null);
+    allKeys.forEach(function(key, idx){
+      chain = chain.then(function(found){
+        if (found) return found; // already loaded
+        return storageSafeGet(key).then(function(val){
+          if (!val) return null;
+          applyState(JSON.parse(val));
+          if (idx > 0){
+            // Migrate to current key
+            window.storage.set(SAVE_KEY, val, false).catch(function(){});
+            setTimeout(function(){ showToast("✅ Progress carried over from your old save!","good"); },600);
+          }
+          return val;
+        });
+      });
+    });
+    return chain.then(function(){});
+  }
+
+  /* ===================== Rendering ===================== */
+
+  function renderHeader(){
+    coinAmountEl.textContent = game.coins;
+    // Show active gear badges
+    if (game.equippedAcc.length === 0){
+      activeGearEl.innerHTML = '';
+    } else {
+      activeGearEl.innerHTML = game.equippedAcc.map(function(key){
+        var a = ACC_BY_KEY[key];
+        if (!a) return '';
+        return '<div class="gear-badge" title="'+a.effectLabel+'"><span class="gear-icon">'+a.icon+'</span><span>'+a.effectLabel+'</span></div>';
+      }).join("");
+    }
+  }
+
+  function renderRig(){
+    var rod = RODS[game.rodIndex];
+    var fx = getEquippedEffects();
+    rodLabelEl.textContent = rod.name;
+    baitLabelEl.textContent = BAITS_BY_KEY[game.currentBait].name;
+    bobberEl.style.background = rod.bobberColor;
+    bobberEl.style.boxShadow = "0 3px 8px rgba(0,0,0,0.45), 0 0 10px 2px "+rod.popperAccent+"66";
+  }
+
+  function renderCooler(){
+    if (game.inventory.length === 0){
+      fishListEl.innerHTML = '<li class="empty-state">Nothing in the cooler yet. Go catch something!</li>';
+    } else {
+      var fx = getEquippedEffects();
+      fishListEl.innerHTML = game.inventory.map(function(f){
+        var iconHtml;
+        if (f.rarity === "megalodon") iconHtml = '<span class="fish-icon" style="font-size:1.8rem;line-height:1;display:flex;align-items:center;">🦈</span>';
+        else if (f.rarity === "boss"){
+          var bd = BOSSES_BY_KEY[f.bossKey] || {};
+          iconHtml = '<span class="fish-icon" style="font-size:1.6rem;line-height:1;display:flex;align-items:center;">'+(bd.emoji||"⚠")+'</span>';
+        } else if (f.rarity === "accessory"){
+          var a = ACC_BY_KEY[f.accKey];
+          iconHtml = '<span class="fish-icon" style="font-size:1.5rem;line-height:1;display:flex;align-items:center;">'+(a?a.icon:"🎁")+'</span>';
+        } else {
+          var isAbyssFish = f.rarity !== "accessory" && f.rarity !== "megalodon" && f.rarity !== "boss" && !f.worldKey && ABYSS_FISH[f.rarity] && ABYSS_FISH[f.rarity].some(function(af){ return af.name === f.name; });
+          var rc = (isAbyssFish ? ABYSS_RARITY_COLORS : RARITY_COLORS)[f.rarity] || RARITY_COLORS.common;
+          var fishColor = f.mutation ? f.mutation.color : rc.color;
+          iconHtml = '<span class="fish-icon" style="color:'+fishColor+';filter:drop-shadow(0 0 4px '+fishColor+'88);">'+FISH_SVG+'</span>';
+        }
+
+        var displayValue = f.value;
+        if (f.rarity !== "accessory"){
+          displayValue = Math.round(f.value * fx.sellBonus);
+        }
+        var valueLabel = (displayValue !== f.value) ? displayValue+'c <span style="opacity:0.5;text-decoration:line-through">'+f.value+'c</span>' : displayValue+'c';
+
+        // Boss card styling
+        var bossCardClass = "";
+        var extraStyle = "";
+        if (f.rarity === "boss"){
+          var bdi = BOSSES_BY_KEY[f.bossKey] || {};
+          bossCardClass = " "+(bdi.cardClass||"");
+          extraStyle = bdi.color ? ' style="border-left-color:'+bdi.color+';box-shadow:0 0 20px 4px '+bdi.color+'44;"' : '';
+        }
+
+        // Mutation badge
+        var mutBadge = "";
+        if (f.mutation){
+          mutBadge = '<span class="mutation-badge" style="color:'+f.mutation.color+';border-color:'+f.mutation.color+'55;background:'+f.mutation.color+'15;">'+f.mutation.emoji+' '+f.mutation.name+'</span>';
+          if (!extraStyle) extraStyle = ' style="box-shadow:0 0 18px 4px '+f.mutation.color+'44;border-color:'+f.mutation.color+'66;"';
+        }
+
+        // World badge
+        var worldBadge = "";
+        if (f.worldKey && f.worldKey !== "dockside"){
+          var wd = WORLDS_BY_KEY[f.worldKey];
+          if (wd) worldBadge = '<span class="mutation-badge" style="color:rgba(255,255,255,0.55);border-color:rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);">'+wd.emoji+' '+wd.name+'</span>';
+        }
+
+        return '<li class="fish-card rarity-'+f.rarity+bossCardClass+(f.mutation?" mutated":"")+'"'+extraStyle+'>' +
+          iconHtml +
+          '<div class="fish-info"><strong>'+f.name+mutBadge+worldBadge+'</strong><span>'+f.weight+' lb · '+valueLabel+'</span></div>' +
+          '<button class="btn btn-ghost btn-small" data-sell="'+f.id+'">Sell</button>' +
+          '</li>';
+      }).join("");
+    }
+    var fx = getEquippedEffects();
+    var total = game.inventory.reduce(function(s,f){
+      return s + (f.rarity==="accessory" ? f.value : Math.round(f.value*fx.sellBonus));
+    },0);
+    fishCountEl.textContent = game.inventory.length+" fish · "+total+"c";
+    sellAllBtn.disabled = game.inventory.length===0;
+    lifetimeStatsEl.textContent = game.stats.totalCaught+" fish caught · "+game.stats.accessoriesFound+" accessories found";
+  }
+
+  function renderShop(){
+    var fx = getEquippedEffects();
+    var currentWorld = game.currentWorld || "dockside";
+
+    // Show universal rods + rods for the current world
+    var visibleRods = RODS.filter(function(rod,i){
+      return rod.world === null || rod.world === currentWorld;
+    });
+
+    rodListEl.innerHTML = visibleRods.map(function(rod){
+      var i = RODS.indexOf(rod);
+      var owned = game.unlockedRods.indexOf(i)!==-1;
+      var equipped = game.rodIndex===i;
+      var btnHtml;
+      if (equipped) btnHtml='<button class="btn btn-ghost btn-small" disabled>Equipped</button>';
+      else if (owned) btnHtml='<button class="btn btn-brass btn-small" data-rod="'+i+'">Equip</button>';
+      else btnHtml='<button class="btn btn-primary btn-small '+(game.coins<rod.cost?"cant-afford":"")+'" data-rod="'+i+'">Buy — '+rod.cost.toLocaleString()+'c</button>';
+      var effectiveZone = rod.zoneSize + fx.zoneBonus;
+      var worldTag = rod.world && rod.world !== "dockside" ? '<span style="font-size:0.65rem;color:var(--brass-light);opacity:0.7;display:block;margin-top:2px;">🌍 World Rod</span>' : '';
+      return '<div class="shop-card '+(equipped?"equipped":"")+'">'+
+        '<div class="shop-card-main"><h3>'+rod.name+'</h3>'+worldTag+
+        '<div class="rod-visual">'+getRodSVG(i)+'</div>'+
+        '<p>'+rod.desc+'</p>'+
+        '<p class="stat-line">Zone '+effectiveZone.toFixed(0)+'% · Speed '+rod.pullSpeed+' · Window '+(rod.hookWindow/1000).toFixed(1)+'s</p></div>'+
+        btnHtml+'</div>';
+    }).join("");
+
+    // Show universal baits + baits for the current world
+    var visibleBaits = BAITS.filter(function(bait){
+      return !bait.world || bait.world === currentWorld;
+    });
+
+    baitListEl.innerHTML = visibleBaits.map(function(bait){
+      var stock = bait.infinite ? "Unlimited" : ("Stock: "+(game.baitInventory[bait.key]||0));
+      var perPack = bait.infinite ? 0 : (bait.perPack + Math.floor(fx.baitBonus));
+      var buyBtn = bait.infinite
+        ? '<button class="btn btn-ghost btn-small" disabled>Always ready</button>'
+        : '<button class="btn btn-brass btn-small '+(game.coins<bait.cost?"cant-afford":"")+'" data-buy="'+bait.key+'">Buy +'+perPack+' — '+bait.cost.toLocaleString()+'c</button>';
+      var worldTag = bait.world ? '<span style="font-size:0.65rem;color:var(--brass-light);opacity:0.7"> 🌍 World Bait</span>' : '';
+      return '<div class="shop-card"><div class="shop-card-main">'+
+        '<h3><span class="bait-icon-wrap">'+getBaitSVG(bait.key)+'</span>'+bait.name+worldTag+'</h3>'+
+        '<p>'+bait.desc+'</p>'+
+        '<p class="stat-line">'+stock+'</p></div>'+buyBtn+'</div>';
+    }).join("");
+
+    baitChipsEl.innerHTML = visibleBaits.map(function(bait){
+      var stock = bait.infinite ? Infinity : (game.baitInventory[bait.key]||0);
+      var disabled = (!bait.infinite && stock<=0);
+      var active = game.currentBait===bait.key;
+      var label = bait.name+(bait.infinite?"":" ("+stock+")");
+      return '<button class="chip '+(active?"active":"")+'" data-select="'+bait.key+'" '+(disabled?"disabled":"")+'>'+label+'</button>';
+    }).join("");
+  }
+
+  function renderAccessories(){
+    // Slots
+    var slotHtml = "";
+    for (var i=0;i<3;i++){
+      var key = game.equippedAcc[i];
+      if (key){
+        var a = ACC_BY_KEY[key];
+        slotHtml += '<div class="acc-slot filled">' +
+          '<button class="slot-remove" data-unequip="'+i+'" title="Unequip">✕</button>' +
+          '<div class="slot-icon">'+a.icon+'</div>' +
+          '<div class="slot-name">'+a.name+'</div>' +
+          '</div>';
+      } else {
+        slotHtml += '<div class="acc-slot"><div style="font-size:1.4rem;opacity:0.25">＋</div><div>Empty</div></div>';
+      }
+    }
+    accSlotsEl.innerHTML = slotHtml;
+
+    // Inventory
+    if (game.accessories.length === 0){
+      accInvEl.innerHTML = '<div style="opacity:0.5;font-size:0.8rem;text-align:center;padding:16px 0;">No accessories yet — keep fishing!</div>';
+    } else {
+      // Group duplicates
+      var counts = {};
+      game.accessories.forEach(function(k){ counts[k]=(counts[k]||0)+1; });
+      var keys = Object.keys(counts);
+      accInvEl.innerHTML = keys.map(function(key){
+        var a = ACC_BY_KEY[key];
+        if (!a) return '';
+        var alreadyOn = game.equippedAcc.filter(function(k){ return k===key; }).length;
+        var count = counts[key];
+        var slotsLeft = 3 - game.equippedAcc.length;
+        var btnHtml = (alreadyOn >= count || slotsLeft <= 0)
+          ? '<button class="btn btn-ghost btn-small" disabled>'+(slotsLeft<=0?"Slots full":"Max equipped")+'</button>'
+          : '<button class="btn btn-purple btn-small" data-equip="'+key+'">Equip'+(alreadyOn?' +1':'')+'</button>';
+        return '<div class="acc-card">' +
+          '<div class="acc-icon">'+a.icon+'</div>' +
+          '<div class="acc-card-info">' +
+            '<strong>'+a.name+(count>1?' ×'+count:'')+'</strong>' +
+            '<span>'+a.effectLabel+'</span>' +
+            '<div style="font-size:0.68rem;opacity:0.55;margin-top:2px">'+a.desc+'</div>' +
+          '</div>' +
+          btnHtml+
+        '</div>';
+      }).join("");
+    }
+  }
+
+  function renderAll(){
+    renderHeader();
+    renderRig();
+    renderCooler();
+    renderShop();
+    renderAccessories();
+    renderWorlds();
+  }
+
+  function renderWorlds(){
+    if (!worldListEl) return;
+    worldListEl.innerHTML = WORLDS.map(function(w){
+      var unlocked = game.unlockedWorlds.indexOf(w.key) !== -1;
+      var active = game.currentWorld === w.key;
+      var cardClass = "world-card world-"+w.key + (active?" active":"") + (unlocked?"":" locked");
+      var btnHtml;
+      if (active){
+        btnHtml = '<button class="btn btn-ghost btn-small" disabled>Current</button>';
+      } else if (unlocked){
+        btnHtml = '<button class="btn btn-brass btn-small" data-selectworld="'+w.key+'">Travel</button>';
+      } else {
+        var canAfford = game.coins >= w.cost;
+        btnHtml = '<button class="btn btn-primary btn-small '+(canAfford?"":"cant-afford")+'" data-buyworld="'+w.key+'">Unlock — '+w.cost.toLocaleString()+'c</button>';
+      }
+      var statusLabel = active ? '<span style="color:var(--glow);font-size:0.65rem;">▶ Active</span>' : (unlocked ? '<span style="opacity:0.5;font-size:0.65rem;">Unlocked</span>' : '<span style="opacity:0.4;font-size:0.65rem;">🔒 Locked</span>');
+      return '<div class="'+cardClass+'">' +
+        '<div class="world-emoji">'+w.emoji+'</div>' +
+        '<div class="world-info">' +
+          '<strong>'+w.name+'</strong>' +
+          statusLabel +
+          '<span class="world-desc">'+w.desc+'</span>' +
+        '</div>' +
+        '<div class="world-btn-area">'+btnHtml+'</div>' +
+      '</div>';
+    }).join("");
+  }
+
+  function buyWorld(key){
+    var w = WORLDS_BY_KEY[key];
+    if (!w || game.unlockedWorlds.indexOf(key) !== -1) return;
+    if (game.coins < w.cost){ showToast("Not enough coins to unlock "+w.name+"!","warn"); return; }
+    game.coins -= w.cost;
+    game.unlockedWorlds.push(key);
+    showToast("🌍 "+w.emoji+" "+w.name+" unlocked!","legend");
+    selectWorld(key);
+  }
+
+  function selectWorld(key){
+    var w = WORLDS_BY_KEY[key];
+    if (!w || game.unlockedWorlds.indexOf(key) === -1) return;
+    game.currentWorld = key;
+    applyWorldTheme(key);
+    showToast("Traveled to "+w.emoji+" "+w.name+"!","good");
+    renderHeader();
+    renderWorlds();
+    saveGame();
+  }
+
+  function applyWorldTheme(worldKey){
+    var worldKeys = WORLDS.map(function(w){ return w.key; });
+    worldKeys.forEach(function(k){ document.body.classList.remove("world-"+k); });
+    document.body.classList.add("world-"+worldKey);
+    var w = WORLDS_BY_KEY[worldKey] || WORLDS_BY_KEY.dockside;
+    var tagEl = document.querySelector(".brand .tagline");
+    var markEl = document.querySelector(".brand-mark");
+    if (tagEl) tagEl.textContent = w.tagline || "a lazy afternoon of fishing";
+    if (markEl) markEl.textContent = w.headerMark || "🎣";
+  }
+
+  /* ===================== Tabs ===================== */
+
+  function switchTab(tab){
+    coolerPanel.classList.toggle("hidden", tab!=="cooler");
+    shopPanel.classList.toggle("hidden", tab!=="shop");
+    accessoriesPanel.classList.toggle("hidden", tab!=="accessories");
+    worldsPanel.classList.toggle("hidden", tab!=="worlds");
+    tabBtns.forEach(function(b){ b.classList.toggle("active", b.dataset.tab===tab); });
+  }
+
+  /* ===================== Pond visuals ===================== */
+
+  function moveBobberToRandomSpot(){
+    var left = randRange(24,86);
+    var top  = randRange(35,65);
+    bobberEl.style.left  = left+"%";
+    bobberEl.style.top   = top+"%";
+    alertBadgeEl.style.left = left+"%";
+    alertBadgeEl.style.top  = top+"%";
+  }
+
+  function spawnRipple(){
+    if (prefersReducedMotion) return;
+    var r = document.createElement("div");
+    r.className = "ripple";
+    r.style.left = bobberEl.style.left||"16%";
+    r.style.top  = bobberEl.style.top||"50%";
+    ripplesEl.appendChild(r);
+    setTimeout(function(){ if(r.parentNode) r.parentNode.removeChild(r); },2300);
+  }
+
+  /* ===================== Core fishing flow ===================== */
+
+  function setPhase(p){ phase=p; }
+
+  function resetToIdle(){
+    setPhase(STATE.IDLE);
+    castWrap.classList.remove("hidden");
+    hookWrap.classList.add("hidden");
+    reelWrap.classList.add("hidden");
+    bobberEl.classList.remove("bite-dip","idle-bob");
+    alertBadgeEl.classList.remove("show","accessory-bite");
+    hookTimerFill.classList.remove("accessory-timer");
+  }
+
+  function cast(){
+    if (phase!==STATE.IDLE) return;
+    var bait = BAITS_BY_KEY[game.currentBait];
+
+    if (!bait.infinite && (game.baitInventory[bait.key]||0)<=0){
+      showToast("Out of "+bait.name+" — switched to Garden Worms.","warn");
+      game.currentBait="worms";
+      renderRig(); renderShop();
+      bait=BAITS_BY_KEY.worms;
+    }
+
+    if (!bait.infinite){ game.baitInventory[bait.key]--; }
+
+    setPhase(STATE.CASTING);
+    castWrap.classList.add("hidden");
+    statusTextEl.textContent="Casting...";
+    moveBobberToRandomSpot();
+    renderShop();
+    saveGame();
+
+    timers.cast = setTimeout(function(){ beginWait(bait); },550);
+  }
+
+  function beginWait(bait){
+    setPhase(STATE.WAITING);
+    var depth = DEPTHS[game.castDepth] || DEPTHS.open;
+    var depthEmoji = depth.key==="shore"?"🏖️":depth.key==="abyss"?"🌑":"🌊";
+    statusTextEl.textContent="Watching the bobber... "+depthEmoji;
+    bobberEl.classList.add("idle-bob");
+    var fx = getEquippedEffects();
+    var waitMult = fx.waitReduction * depth.waitMult;
+    var dur = randRange(bait.wait[0],bait.wait[1]) * waitMult;
+    timers.wait = setTimeout(function(){ triggerBite(bait); },dur);
+  }
+
+  function triggerBite(bait){
+    setPhase(STATE.BITING);
+    bobberEl.classList.remove("idle-bob");
+    bobberEl.classList.add("bite-dip");
+
+    // 4% base chance to find an accessory instead of fish
+    var isAccessory = Math.random() < 0.04;
+
+    if (isAccessory){
+      var accKey = pickAccessoryDrop();
+      pendingFish = {isAccessory:true, accKey:accKey};
+      alertBadgeEl.classList.add("show","accessory-bite");
+      alertBadgeEl.textContent = "✦";
+      statusTextEl.textContent = "Something glimmers on the line... Hook it!";
+      hookTimerFill.classList.add("accessory-timer");
+    } else {
+      // Boss check (before normal rarity — bosses are ultra-rare)
+      var fx0 = getEquippedEffects();
+      var depth = DEPTHS[game.castDepth] || DEPTHS.open;
+      var currentWorldKey = game.currentWorld || "dockside";
+      var bossTriggered = null;
+      var bossRoll = Math.random();
+      var bossCum = 0;
+      // Filter bosses: world-specific bosses only appear in their world; null-world bosses appear everywhere except worlds with their own boss
+      var worldHasOwnBoss = BOSSES.some(function(b){ return b.world === currentWorldKey; });
+      var eligibleBosses = BOSSES.filter(function(b){
+        if (b.world === currentWorldKey) return true;   // world's own boss
+        if (b.world !== null) return false;             // another world's boss
+        return !worldHasOwnBoss;                        // generic bosses only if no world boss
+      });
+      for (var bi=0;bi<eligibleBosses.length;bi++){
+        var bchance = eligibleBosses[bi].chance * fx0.megalodonChance * depth.bossChanceMult;
+        bossCum += bchance;
+        if (bossRoll < bossCum){ bossTriggered = eligibleBosses[bi]; break; }
+      }
+
+      if (bossTriggered){
+        var bv = Math.round(randRange(bossTriggered.v[0], bossTriggered.v[1]));
+        var bw = Math.round(randRange(bossTriggered.w[0], bossTriggered.w[1])*10)/10;
+        pendingFish = {name:bossTriggered.name, rarity:"boss", value:bv, weight:bw, bossData:bossTriggered};
+        alertBadgeEl.classList.add("show","boss-bite");
+        alertBadgeEl.textContent = "⚠";
+        statusTextEl.textContent = "⚠ "+bossTriggered.name.toUpperCase()+" DETECTED — HOOK IT NOW!!";
+        hookTimerFill.style.background = bossTriggered.color;
+      } else {
+      var rarity = pickRarity(depth.weightMod ? depth.weightMod(bait.weights) : bait.weights);
+      var currentWorldData = WORLDS_BY_KEY[game.currentWorld] || WORLDS_BY_KEY.dockside;
+      var worldFish = currentWorldData.fish;
+      var worldPool = worldFish ? worldFish : (depth.key === "abyss" ? ABYSS_FISH : FISH);
+      if (!worldFish && depth.key === "abyss") worldPool = ABYSS_FISH;
+      else if (!worldFish) worldPool = FISH;
+      else worldPool = worldFish;
+      var pool = worldPool[rarity] || FISH[rarity];
+      var base = pool[Math.floor(Math.random()*pool.length)];
+      var value = Math.round(randRange(base.v[0],base.v[1]));
+      var weight = Math.round(randRange(base.w[0],base.w[1])*10)/10;
+      pendingFish = {name:base.name, rarity:rarity, value:value, weight:weight, worldKey:game.currentWorld};
+
+      // Mutation roll (megalodon can't mutate)
+      if (rarity !== "megalodon" && Math.random() < MUTATION_CHANCE){
+        var mut = pickMutation();
+        pendingFish.mutation = mut;
+        pendingFish.value = Math.round(value * mut.mult);
+        alertBadgeEl.classList.add("show");
+        alertBadgeEl.textContent = "!";
+        statusTextEl.textContent = "A " + mut.emoji + " " + mut.name + " fish bites! Hook it!";
+      } else {
+        alertBadgeEl.classList.add("show");
+        alertBadgeEl.textContent = "!";
+        if (rarity==="megalodon") statusTextEl.textContent="THE WATER IS TREMBLING... HOOK IT NOW!!";
+        else statusTextEl.textContent="Something's biting!! Hook it!";
+      }
+      }
+    }
+
+    var fx = getEquippedEffects();
+    startHookCountdown(RODS[game.rodIndex].hookWindow * fx.hookWindow);
+  }
+
+  function startHookCountdown(durationMs){
+    hookWrap.classList.remove("hidden");
+    var startTime = performance.now();
+    function tick(now){
+      var elapsed = now-startTime;
+      var remain = Math.max(0,1-elapsed/durationMs);
+      hookTimerFill.style.width=(remain*100)+"%";
+      if (elapsed>=durationMs){ missedHook(); return; }
+      hookRAF = requestAnimationFrame(tick);
+    }
+    hookRAF = requestAnimationFrame(tick);
+  }
+
+  function missedHook(){
+    cancelAnimationFrame(hookRAF);
+    bobberEl.classList.remove("bite-dip");
+    alertBadgeEl.classList.remove("show","accessory-bite","boss-bite");
+    alertBadgeEl.textContent = "!";
+    hookTimerFill.classList.remove("accessory-timer");
+    hookTimerFill.style.background = "";
+    if (pendingFish && pendingFish.isAccessory){
+      statusTextEl.textContent="It slipped away, with whatever was shining...";
+    } else {
+      var big = pendingFish && (pendingFish.rarity==="legendary"||pendingFish.rarity==="rare"||pendingFish.rarity==="megalodon"||pendingFish.rarity==="boss");
+      statusTextEl.textContent = big ? "It felt MASSIVE... but it got away!" : "It got away. Try again!";
+    }
+    pendingFish=null;
+    hookWrap.classList.add("hidden");
+    resetToIdle();
+  }
+
+  function onHookClick(){
+    if (phase!==STATE.BITING) return;
+    cancelAnimationFrame(hookRAF);
+    hookWrap.classList.add("hidden");
+    alertBadgeEl.classList.remove("show","accessory-bite","boss-bite");
+    alertBadgeEl.textContent = "!";
+    hookTimerFill.classList.remove("accessory-timer");
+    hookTimerFill.style.background = "";
+    startReel();
+  }
+
+  /* ----- Reel minigame ----- */
+
+  function startReel(){
+    setPhase(STATE.REELING);
+    reelWrap.classList.remove("hidden");
+
+    var isAcc  = pendingFish && pendingFish.isAccessory;
+    var isMeg  = pendingFish && pendingFish.rarity==="megalodon";
+    var isBoss = pendingFish && pendingFish.rarity==="boss";
+
+    if (isBoss){
+      var bd = pendingFish.bossData;
+      statusTextEl.textContent = bd.emoji+" "+bd.name.toUpperCase()+" — "+bd.abilityDesc.split("—")[1].trim();
+    } else if (isMeg) statusTextEl.textContent="🦈 IT'S ENORMOUS! Hold on for your life!";
+    else if (isAcc) statusTextEl.textContent="✦ Keep it steady — reel it in!";
+    else statusTextEl.textContent="Keep it in the glow! Hold to reel.";
+
+    var rod = RODS[game.rodIndex];
+    var fx = getEquippedEffects();
+    var depth = DEPTHS[game.castDepth] || DEPTHS.open;
+    var baseDiff = isAcc ? DIFFICULTY.accessory : (isBoss ? DIFFICULTY.boss : DIFFICULTY[pendingFish.rarity]);
+    // Clone diff and apply depth drain multiplier
+    var diff = Object.assign({}, baseDiff, {drain: baseDiff.drain * depth.drainMult});
+    var effectiveZoneSize = rod.zoneSize + fx.zoneBonus;
+    var effectivePullSpeed = rod.pullSpeed * fx.pullSpeed;
+    var effectiveFillBonus = rod.fillBonus + fx.fillBonus;
+
+    reel = {
+      fishPos:50, fishTarget:50, lastWanderChange:performance.now(),
+      zonePos:50, zoneSize:effectiveZoneSize,
+      progress:50, holding:false,
+      lastTime:performance.now(),
+      rod:{pullSpeed:effectivePullSpeed, fillBonus:effectiveFillBonus, zoneSize:effectiveZoneSize},
+      diff:diff, raf:null,
+      // Boss ability state
+      boss: isBoss ? pendingFish.bossData : null,
+      bossAbilityActive: false,
+      bossAbilityEnd: 0,
+      nextAbilityTime: isBoss ? (performance.now() + randRange(pendingFish.bossData.cooldownMin, pendingFish.bossData.cooldownMax)) : Infinity
+    };
+
+    catchZoneEl.style.height = effectiveZoneSize+"%";
+    fishMarkerEl.innerHTML = FISH_SVG;
+
+    // Boss ability bar
+    bossAbilityBar.classList.toggle("hidden", !isBoss);
+    if (isBoss){
+      bossAbilityFill.style.background = pendingFish.bossData.color;
+      bossAbilityFill.style.width = "100%";
+    }
+
+    if (isBoss){
+      var bd2 = pendingFish.bossData;
+      fishMarkerEl.style.color = bd2.color;
+      fishMarkerEl.className = "fish-marker "+bd2.glowClass;
+      fishMarkerEl.style.transform = "translate(-50%,-50%) scale(2)";
+      // Custom boss SVGs
+      if (bd2.key === "frozen_leviathan"){
+        fishMarkerEl.innerHTML = '<svg viewBox="0 0 100 50" xmlns="http://www.w3.org/2000/svg">'
+          +'<path d="M5 25 C15 10 35 40 55 25 C75 10 88 30 98 20" stroke="#80deea" stroke-width="7" fill="none" stroke-linecap="round"/>'
+          +'<ellipse cx="7" cy="25" rx="7" ry="5" fill="#80deea"/>'
+          +'<circle cx="5" cy="23" r="1.8" fill="#01579b"/>'
+          +'<polygon points="25,12 28,2 31,12" fill="#b2ebf2"/>'
+          +'<polygon points="48,35 51,45 54,35" fill="#b2ebf2"/>'
+          +'<polygon points="70,10 73,1 76,10" fill="#b2ebf2"/>'
+          +'<polygon points="88,28 91,38 94,28" fill="#b2ebf2"/>'
+        +'</svg>';
+      } else if (bd2.key === "magma_leviathan"){
+        fishMarkerEl.innerHTML = '<svg viewBox="0 0 100 50" xmlns="http://www.w3.org/2000/svg">'
+          +'<path d="M5 28 C18 8 38 44 58 22 C72 8 88 36 98 18" stroke="#ff5722" stroke-width="9" fill="none" stroke-linecap="round"/>'
+          +'<ellipse cx="6" cy="28" rx="8" ry="6" fill="#ff5722"/>'
+          +'<circle cx="4" cy="25" r="2" fill="#ff1744"/>'
+          +'<path d="M20 18 L24 6 L28 14 L32 4 L36 16" stroke="#ff9800" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+          +'<path d="M55 26 L59 14 L63 22 L67 12 L71 24" stroke="#ff9800" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+          +'<circle cx="22" cy="32" r="3" fill="#ff9800" opacity="0.7"/>'
+          +'<circle cx="65" cy="36" r="2.5" fill="#ff9800" opacity="0.7"/>'
+        +'</svg>';
+      } else if (bd2.key === "angel_anglerfish"){
+        fishMarkerEl.innerHTML = '<svg viewBox="0 0 100 50" xmlns="http://www.w3.org/2000/svg">'
+          +'<path d="M12 25 C12 12 38 6 55 15 L80 5 L72 25 L80 45 L55 35 C38 44 12 38 12 25 Z" fill="#fff176" opacity="0.9"/>'
+          +'<circle cx="26" cy="20" r="3" fill="#f9a825"/>'
+          +'<circle cx="26" cy="20" r="1.5" fill="#fff"/>'
+          +'<path d="M55 15 C60 5 58 -2 62 2" stroke="#fff176" stroke-width="2" fill="none" stroke-linecap="round"/>'
+          +'<circle cx="63" cy="2" r="4" fill="#fff9c4" opacity="0.95"/>'
+          +'<circle cx="63" cy="2" r="2" fill="#fff"/>'
+          +'<path d="M30 32 L36 42 M42 34 L44 44 M50 33 L54 43" stroke="#f9a825" stroke-width="1.5" stroke-linecap="round"/>'
+          +'<path d="M18 18 L8 10 M18 30 L8 38" stroke="#fff176" stroke-width="2" stroke-linecap="round" opacity="0.7"/>'
+        +'</svg>';
+      }
+    } else if (isMeg){
+      fishMarkerEl.style.color="#bf4fff";
+      fishMarkerEl.className="fish-marker fish-glow-megalodon";
+      fishMarkerEl.style.transform="translate(-50%,-50%) scale(1.5)";
+    } else if (isAcc){
+      fishMarkerEl.style.color="#bf4fff";
+      fishMarkerEl.className="fish-marker fish-glow-megalodon";
+      fishMarkerEl.style.transform="translate(-50%,-50%)";
+      var a = ACC_BY_KEY[pendingFish.accKey];
+      fishMarkerEl.innerHTML = '<div style="font-size:1.2rem;line-height:1;transform:translate(-50%,-50%);position:absolute;left:50%;">'+(a?a.icon:"✦")+'</div>';
+    } else {
+      var isAbyss = game.castDepth === "abyss" && (game.currentWorld === "dockside" || !game.currentWorld);
+      var rc = (isAbyss ? ABYSS_RARITY_COLORS : RARITY_COLORS)[pendingFish.rarity] || RARITY_COLORS.common;
+      var mut = pendingFish.mutation;
+      fishMarkerEl.style.transform="translate(-50%,-50%)";
+      if (mut){
+        fishMarkerEl.style.color = mut.color;
+        fishMarkerEl.className = "fish-marker fish-glow-mutation-"+mut.key;
+      } else {
+        fishMarkerEl.style.color = rc.color;
+        fishMarkerEl.className = "fish-marker "+rc.glowClass;
+      }
+    }
+
+    bindReelControls();
+    reel.raf = requestAnimationFrame(reelLoop);
+  }
+
+  function bindReelControls(){
+    function down(e){ e.preventDefault(); if(reel){ reel.holding=true; reelBtn.classList.add("held"); } }
+    function up(){ if(reel){ reel.holding=false; reelBtn.classList.remove("held"); } }
+    reelBtn.onpointerdown=down;
+    reelBtn.onpointerup=up;
+    reelBtn.onpointerleave=up;
+    reelBtn.onpointercancel=up;
+  }
+
+  function reelLoop(now){
+    if (!reel) return;
+    var dt=Math.min(50,now-reel.lastTime);
+    reel.lastTime=now;
+    var dtSec=dt/1000;
+
+    /* ---- Boss ability system ---- */
+    if (reel.boss){
+      var boss = reel.boss;
+      // Trigger ability when cooldown expires
+      if (!reel.bossAbilityActive && now >= reel.nextAbilityTime){
+        reel.bossAbilityActive = true;
+        reel.bossAbilityEnd = now + boss.duration;
+        statusTextEl.textContent = boss.abilityDesc;
+        reelTrackEl.classList.add(boss.trackClass);
+        bossAbilityFill.style.background = "#ff1744";
+        if (boss.abilityEffect === "surge"){
+          reel.fishTarget = randRange(5, 95); // teleport
+          reel.fishPos = reel.fishTarget;
+          if (!prefersReducedMotion){
+            document.body.classList.remove("shake-mild","shake-hard");
+            void document.body.offsetWidth;
+            document.body.classList.add("shake-hard");
+            setTimeout(function(){ document.body.classList.remove("shake-hard"); },600);
+          }
+        }
+      }
+      // End ability
+      if (reel.bossAbilityActive && now >= reel.bossAbilityEnd){
+        reel.bossAbilityActive = false;
+        reel.nextAbilityTime = now + randRange(boss.cooldownMin, boss.cooldownMax);
+        reelTrackEl.classList.remove(boss.trackClass);
+        bossAbilityFill.style.background = boss.color;
+        statusTextEl.textContent = "Keep it in the glow! Hold to reel.";
+      }
+      // Update ability bar: shows cooldown countdown (full=ready, draining=on cooldown)
+      if (reel.bossAbilityActive){
+        var pct = ((reel.bossAbilityEnd - now) / boss.duration) * 100;
+        bossAbilityFill.style.width = clamp(pct,0,100)+"%";
+      } else {
+        var cdPct = 100 - clamp((reel.nextAbilityTime - now) / ((boss.cooldownMin+boss.cooldownMax)/2) * 100, 0, 100);
+        bossAbilityFill.style.width = cdPct+"%";
+      }
+    }
+
+    if (now-reel.lastWanderChange > randRange(reel.diff.wanderMin,reel.diff.wanderMax)){
+      reel.fishTarget=randRange(8,92);
+      reel.lastWanderChange=now;
+    }
+    reel.fishPos+=(reel.fishTarget-reel.fishPos)*reel.diff.lerp;
+    reel.fishPos=clamp(reel.fishPos,2,98);
+
+    /* Zone movement — reverse effect flips hold/release */
+    var isReverse = reel.boss && reel.bossAbilityActive && reel.boss.abilityEffect==="reverse";
+    if (isReverse){
+      if (reel.holding){ reel.zonePos+=GRAVITY*dtSec; }       // hold = falls
+      else { reel.zonePos-=reel.rod.pullSpeed*dtSec; }         // release = rises
+    } else {
+      if (reel.holding){ reel.zonePos-=reel.rod.pullSpeed*dtSec; }
+      else { reel.zonePos+=GRAVITY*dtSec; }
+    }
+    var half=reel.zoneSize/2;
+    reel.zonePos=clamp(reel.zonePos,half,100-half);
+
+    var top=reel.zonePos-half, bottom=reel.zonePos+half;
+    var inZone=reel.fishPos>=top&&reel.fishPos<=bottom;
+    var fillRate=BASE_FILL+reel.rod.fillBonus;
+
+    /* Progress — boss abilities modify fill/drain */
+    if (reel.boss && reel.bossAbilityActive){
+      var eff = reel.boss.abilityEffect;
+      if (eff==="freeze"){
+        // Frostbite: always drain, even in zone
+        reel.progress -= reel.diff.drain * 2.2 * dtSec;
+      } else if (eff==="surge"){
+        // Surge: triple drain when out, normal fill in
+        if (inZone){ reel.progress+=fillRate*dtSec; }
+        else { reel.progress-=reel.diff.drain*3*dtSec; }
+      } else {
+        // Reverse: normal fill/drain (challenge is controls)
+        if (inZone){ reel.progress+=fillRate*dtSec; }
+        else { reel.progress-=reel.diff.drain*dtSec; }
+      }
+    } else {
+      if (inZone){ reel.progress+=fillRate*dtSec; }
+      else { reel.progress-=reel.diff.drain*dtSec; }
+    }
+    reel.progress=clamp(reel.progress,0,100);
+
+    fishMarkerEl.style.top=reel.fishPos+"%";
+    catchZoneEl.style.top=(reel.zonePos-half)+"%";
+    progressFillEl.style.width=reel.progress+"%";
+    progressFillEl.classList.toggle("progress-low", reel.progress < 25);
+    progressFillEl.classList.toggle("progress-high", reel.progress > 80);
+    catchZoneEl.classList.toggle("zone-active",inZone);
+
+    if (reel.progress>=100){ finishReel(true); return; }
+    if (reel.progress<=0){ finishReel(false); return; }
+
+    // Screen shakes for heavy fish
+    if (!prefersReducedMotion){
+      var shakeTarget = pendingFish && (pendingFish.rarity==="megalodon"||pendingFish.rarity==="boss");
+      if (shakeTarget && Math.random()<0.012){
+        var intensity=Math.random()<0.4?"shake-hard":"shake-mild";
+        document.body.classList.remove("shake-mild","shake-hard");
+        void document.body.offsetWidth;
+        document.body.classList.add(intensity);
+        setTimeout(function(){ document.body.classList.remove("shake-mild","shake-hard"); },700);
+      }
+    }
+
+    reel.raf=requestAnimationFrame(reelLoop);
+  }
+
+  function finishReel(success){
+    if (reel&&reel.raf) cancelAnimationFrame(reel.raf);
+    // Clean up boss state
+    if (reel&&reel.boss) reelTrackEl.classList.remove(reel.boss.trackClass);
+    bossAbilityBar.classList.add("hidden");
+    reelWrap.classList.add("hidden");
+    reelBtn.onpointerdown=null; reelBtn.onpointerup=null;
+    reelBtn.onpointerleave=null; reelBtn.onpointercancel=null;
+
+    if (success&&pendingFish){
+      if (pendingFish.isAccessory) catchAccessory(pendingFish.accKey);
+      else catchFish(pendingFish);
+    } else {
+      statusTextEl.textContent="The line went slack — it got away!";
+      showToast("It got away...","warn");
+    }
+    pendingFish=null;
+    reel=null;
+    resetToIdle();
+  }
+
+  function catchFish(fish){
+    var fx = getEquippedEffects();
+    // World value multiplier — further worlds pay more
+    var worldMults = {dockside:1, frozen_tundra:2.5, haunted_bayou:5, volcanic_rift:10, celestial_sea:25};
+    var worldMult = worldMults[fish.worldKey || game.currentWorld] || 1;
+    // Boss world multiplier uses the boss's world
+    if (fish.rarity === "boss" && fish.bossData && fish.bossData.world){
+      worldMult = worldMults[fish.bossData.world] || worldMult;
+    }
+    var scaledValue = Math.round(fish.value * worldMult);
+    var displayValue = Math.round(scaledValue * fx.sellBonus);
+    var entry = {id:makeId(), name:fish.name, rarity:fish.rarity, value:scaledValue, weight:fish.weight, mutation:fish.mutation||null, bossKey:fish.bossData?fish.bossData.key:null, worldKey:fish.worldKey||game.currentWorld};
+    game.inventory.push(entry);
+    game.stats.totalCaught++;
+    if (displayValue > game.stats.biggestValue) game.stats.biggestValue=displayValue;
+
+    var mutSuffix = fish.mutation ? " ["+fish.mutation.emoji+" "+fish.mutation.name+"]" : "";
+    var worldBonus = worldMult > 1 ? " ×"+worldMult+"🌍" : "";
+    if (fish.rarity==="boss"){
+      statusTextEl.textContent="🏆 You defeated the "+fish.name+"! ("+fish.weight+" lb)";
+    } else {
+      statusTextEl.textContent="You caught a "+fish.name+"!"+mutSuffix+" ("+fish.weight+" lb)";
+    }
+
+    if (fish.rarity==="megalodon"){
+      showToast("🦈 YOU CAUGHT THE MEGALODON — "+displayValue+"c"+worldBonus,"legend");
+      if (!prefersReducedMotion){
+        document.body.classList.remove("shake-mild","shake-hard");
+        void document.body.offsetWidth;
+        document.body.classList.add("shake-hard");
+        setTimeout(function(){ document.body.classList.remove("shake-hard"); },800);
+      }
+    } else if (fish.rarity==="boss"){
+      var bd = fish.bossData || BOSSES_BY_KEY[fish.bossKey] || {};
+      showToast((bd.emoji||"⚠")+" YOU DEFEATED THE "+fish.name.toUpperCase()+" — "+displayValue+"c"+worldBonus,"legend");
+      if (!prefersReducedMotion){
+        document.body.classList.remove("shake-mild","shake-hard");
+        void document.body.offsetWidth;
+        document.body.classList.add("shake-hard");
+        setTimeout(function(){ document.body.classList.remove("shake-hard"); },1000);
+      }
+    } else {
+      var prefix=fish.rarity==="legendary"?"🌟":(fish.rarity==="rare"?"✨":"🐟");
+      if (fish.mutation) prefix = fish.mutation.emoji;
+      var toastType=fish.rarity==="legendary"?"legend":(fish.mutation?"acc":"good");
+      showToast(prefix+" Caught "+fish.name+mutSuffix+" — "+displayValue+"c"+worldBonus,toastType);
+    }
+    renderCooler(); renderHeader(); saveGame();
+  }
+
+  function catchAccessory(accKey){
+    var a = ACC_BY_KEY[accKey];
+    game.accessories.push(accKey);
+    game.stats.accessoriesFound++;
+    // Put a placeholder in cooler so the player sees it (0c sell value)
+    var entry = {id:makeId(), name:a.name, rarity:"accessory", value:0, weight:0, accKey:accKey};
+    game.inventory.push(entry);
+
+    statusTextEl.textContent="You found: "+a.name+"! ("+a.effectLabel+")";
+    showToast(a.icon+" Found "+a.name+"! — "+a.effectLabel,"acc");
+    renderCooler(); renderHeader(); renderAccessories(); saveGame();
+  }
+
+  /* ===================== Shop & cooler actions ===================== */
+
+  function sellFish(id){
+    var idx=game.inventory.findIndex(function(f){ return f.id===id; });
+    if (idx<0) return;
+    var f=game.inventory.splice(idx,1)[0];
+    if (f.rarity==="accessory"){
+      showToast("Accessories can't be sold — equip or keep them.","warn");
+      game.inventory.splice(idx,0,f); // put it back
+      return;
+    }
+    var fx=getEquippedEffects();
+    var earned=Math.round(f.value*fx.sellBonus);
+    game.coins+=earned;
+    renderCooler(); renderHeader(); renderShop(); saveGame();
+  }
+
+  function sellAll(){
+    if (game.inventory.length===0) return;
+    var fx=getEquippedEffects();
+    var total=0;
+    var kept=[];
+    game.inventory.forEach(function(f){
+      if (f.rarity==="accessory"){ kept.push(f); }
+      else { total+=Math.round(f.value*fx.sellBonus); }
+    });
+    game.coins+=total;
+    game.inventory=kept;
+    showToast("Sold all fish for "+total+"c"+(kept.length?" (kept "+kept.length+" accessory items)":""),"good");
+    renderCooler(); renderHeader(); renderShop(); saveGame();
+  }
+
+  function buyRod(idx){
+    var rod=RODS[idx];
+    if (game.unlockedRods.indexOf(idx)!==-1){
+      game.rodIndex=idx;
+      renderShop(); renderRig(); saveGame(); return;
+    }
+    if (game.coins<rod.cost){ showToast("Not enough coins for the "+rod.name,"warn"); return; }
+    game.coins-=rod.cost;
+    game.unlockedRods.push(idx);
+    game.rodIndex=idx;
+    showToast("Equipped the "+rod.name+"!","good");
+    renderHeader(); renderShop(); renderRig(); saveGame();
+  }
+
+  function buyBait(key){
+    var bait=BAITS_BY_KEY[key];
+    var fx=getEquippedEffects();
+    if (game.coins<bait.cost){ showToast("Not enough coins for "+bait.name,"warn"); return; }
+    game.coins-=bait.cost;
+    var amount=bait.perPack+Math.floor(fx.baitBonus);
+    game.baitInventory[key]=(game.baitInventory[key]||0)+amount;
+    showToast("Bought "+amount+" "+bait.name,"good");
+    renderHeader(); renderShop(); saveGame();
+  }
+
+  function selectBait(key){
+    var bait=BAITS_BY_KEY[key];
+    if (!bait.infinite&&(game.baitInventory[key]||0)<=0) return;
+    game.currentBait=key;
+    renderRig(); renderShop(); saveGame();
+  }
+
+  function onReset(){
+    if (!window.confirm("Reset all progress? This cannot be undone.")) return;
+    game=defaultState();
+    if (window.storage){ window.storage.delete(SAVE_KEY,false).catch(function(){}); }
+    try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+    resetToIdle();
+    statusTextEl.textContent="Ready when you are. Cast your line to begin.";
+    renderAll();
+    showToast("Progress reset.","warn");
+  }
+
+  /* ---- Export / Import ---- */
+  var saveModal    = document.getElementById("saveModal");
+  var modalTitle   = document.getElementById("modalTitle");
+  var modalDesc    = document.getElementById("modalDesc");
+  var saveDataBox  = document.getElementById("saveDataBox");
+  var modalCancel  = document.getElementById("modalCancel");
+  var modalAction  = document.getElementById("modalAction");
+
+  function openModal(mode){
+    saveModal.style.display = "flex";
+    if (mode === "export"){
+      modalTitle.textContent  = "Export Save";
+      modalDesc.textContent   = "Copy everything below, then paste it into the Import screen on any version of Dockside.";
+      saveDataBox.value       = JSON.stringify(game);
+      saveDataBox.readOnly    = true;
+      modalAction.textContent = "Copy to Clipboard";
+      modalAction.onclick     = function(){
+        navigator.clipboard.writeText(saveDataBox.value).then(function(){
+          showToast("Save copied to clipboard!","good");
+          closeModal();
+        }).catch(function(){
+          saveDataBox.select();
+          document.execCommand("copy");
+          showToast("Save copied!","good");
+          closeModal();
+        });
+      };
+    } else {
+      modalTitle.textContent  = "Import Save";
+      modalDesc.textContent   = "Paste your exported save data below (from any Dockside version) and hit Load.";
+      saveDataBox.value       = "";
+      saveDataBox.readOnly    = false;
+      saveDataBox.placeholder = "Paste save data here...";
+      modalAction.textContent = "Load Save";
+      modalAction.onclick     = function(){
+        try{
+          var parsed = JSON.parse(saveDataBox.value.trim());
+          if (typeof parsed.coins === "undefined") throw new Error("Not a valid save.");
+          // applyState via loadGame helper — just do it inline
+          var def = defaultState();
+          game = Object.assign(def, parsed);
+          game.baitInventory = Object.assign({cricket:0,minnow:0,goldenroe:0,deepchum:0,glowlure:0,glacier_roe:0,spirit_moth:0,magma_grub:0,void_crystal:0}, parsed.baitInventory||{});
+          game.stats         = Object.assign(def.stats, parsed.stats||{});
+          game.inventory     = Array.isArray(parsed.inventory)?parsed.inventory:[];
+          game.accessories   = Array.isArray(parsed.accessories)?parsed.accessories:[];
+          game.equippedAcc   = Array.isArray(parsed.equippedAcc)?parsed.equippedAcc:[];
+          game.unlockedRods  = (Array.isArray(parsed.unlockedRods)&&parsed.unlockedRods.length)?parsed.unlockedRods:[0];
+          game.rodIndex      = (typeof parsed.rodIndex==="number")?parsed.rodIndex:0;
+          game.currentBait   = parsed.currentBait||"worms";
+          game.currentWorld  = parsed.currentWorld||"dockside";
+          game.unlockedWorlds= (Array.isArray(parsed.unlockedWorlds)&&parsed.unlockedWorlds.length)?parsed.unlockedWorlds:["dockside"];
+          saveGame();
+          renderAll();
+          resetToIdle();
+          applyWorldTheme(game.currentWorld || "dockside");
+          closeModal();
+          showToast("✅ Save imported! Welcome back.","good");
+        } catch(err){
+          showToast("❌ Couldn't read that save — make sure you copied the full thing.","warn");
+        }
+      };
+    }
+  }
+
+  function closeModal(){
+    saveModal.style.display = "none";
+  }
+
+  /* ===================== Wiring ===================== */
+
+  function setupEventListeners(){
+    castBtn.addEventListener("click",cast);
+    hookBtn.addEventListener("click",onHookClick);
+    sellAllBtn.addEventListener("click",sellAll);
+    resetBtn.addEventListener("click",onReset);
+    document.getElementById("exportBtn").addEventListener("click",function(){ openModal("export"); });
+    document.getElementById("importBtn").addEventListener("click",function(){ openModal("import"); });
+    modalCancel.addEventListener("click",closeModal);
+    saveModal.addEventListener("click",function(e){ if(e.target===saveModal) closeModal(); });
+
+    // Depth selector
+    document.querySelectorAll(".depth-btn").forEach(function(btn){
+      btn.addEventListener("click",function(){
+        game.castDepth = btn.dataset.depth;
+        document.querySelectorAll(".depth-btn").forEach(function(b){ b.classList.remove("active"); });
+        btn.classList.add("active");
+        applyDepthTheme(game.castDepth);
+        var msgs = {shore:"Casting from the shore — quick bites, common fish.",open:"Open water — all fish are fair game.",abyss:"The Abyss — long waits, but bosses hunt here..."};
+        statusTextEl.textContent = msgs[game.castDepth] || "Ready.";
+        saveGame();
+      });
+    });
+
+    tabBtns.forEach(function(btn){
+      btn.addEventListener("click",function(){ switchTab(btn.dataset.tab); });
+    });
+    fishListEl.addEventListener("click",function(e){
+      var btn=e.target.closest("[data-sell]");
+      if (btn) sellFish(btn.dataset.sell);
+    });
+    rodListEl.addEventListener("click",function(e){
+      var btn=e.target.closest("[data-rod]");
+      if (btn) buyRod(Number(btn.dataset.rod));
+    });
+    baitListEl.addEventListener("click",function(e){
+      var btn=e.target.closest("[data-buy]");
+      if (btn) buyBait(btn.dataset.buy);
+    });
+    baitChipsEl.addEventListener("click",function(e){
+      var chip=e.target.closest("[data-select]");
+      if (chip) selectBait(chip.dataset.select);
+    });
+    accInvEl.addEventListener("click",function(e){
+      var btn=e.target.closest("[data-equip]");
+      if (btn) equipAcc(btn.dataset.equip);
+    });
+    accSlotsEl.addEventListener("click",function(e){
+      var btn=e.target.closest("[data-unequip]");
+      if (btn) unequipAcc(Number(btn.dataset.unequip));
+    });
+    worldListEl.addEventListener("click",function(e){
+      var btn=e.target.closest("[data-buyworld]");
+      if (btn){ buyWorld(btn.dataset.buyworld); return; }
+      btn=e.target.closest("[data-selectworld]");
+      if (btn) selectWorld(btn.dataset.selectworld);
+    });
+  }
+
+  function applyDepthTheme(depth){
+    document.body.classList.remove("depth-shore","depth-open","depth-abyss");
+    document.body.classList.add("depth-"+(depth||"open"));
+    var taglines = {
+      shore:"a lazy afternoon at the shore",
+      open:"a lazy afternoon of fishing",
+      abyss:"something stirs in the deep..."
+    };
+    var marks = {shore:"🎣", open:"🎣", abyss:"🌑"};
+    var tagEl = document.querySelector(".brand .tagline");
+    var markEl = document.querySelector(".brand-mark");
+    if (tagEl) tagEl.textContent = taglines[depth] || taglines.open;
+    if (markEl) markEl.textContent = marks[depth] || "🎣";
+  }
+
+  /* ===================== Init ===================== */
+
+  function init(){
+    loadGame().then(function(){
+      renderAll();
+      resetToIdle();
+      setupEventListeners();
+      moveBobberToRandomSpot();
+      bobberEl.classList.add("idle-bob");
+      // Restore depth selector state
+      var savedDepth = game.castDepth || "open";
+      document.querySelectorAll(".depth-btn").forEach(function(btn){
+        btn.classList.toggle("active", btn.dataset.depth === savedDepth);
+      });
+      applyDepthTheme(savedDepth);
+      // Apply world theme
+      applyWorldTheme(game.currentWorld || "dockside");
+      if (!prefersReducedMotion){
+        rippleInterval=setInterval(spawnRipple,1800);
+      }
+    });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
